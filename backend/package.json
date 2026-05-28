@@ -1,0 +1,33 @@
+{
+  "name": "nasi-goreng-polonia-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend API for Nasi Goreng Polonia",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "NODE_ENV=test jest --runInBand --forceExit",
+    "migrate:orders-phase1": "node scripts/migrate-orders-phase1.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.5.2",
+    "joi": "^18.0.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.19.1",
+    "nodemailer": "^8.0.9"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.1.4",
+    "supertest": "^7.1.0"
+  }
+}

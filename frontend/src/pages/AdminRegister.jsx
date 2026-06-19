@@ -10,14 +10,8 @@ export default function AdminRegister() {
 
   const registerMutation = useMutation({
     mutationFn: (body) => api.post('/auth/register-admin', body),
-    onSuccess: (response) => {
-      // Redirect to verify-email page with the token
-      const token = response.data?.data?.verificationToken
-      if (token) {
-        navigate(`/verify-email/${token}`, { replace: true })
-      } else {
-        navigate('/admin/login', { replace: true })
-      }
+    onSuccess: () => {
+      navigate('/admin/login', { replace: true })
     },
   })
 
@@ -101,7 +95,7 @@ export default function AdminRegister() {
 
           {registerMutation.isSuccess && (
             <p style={{ color: '#43a047', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-              Registrasi berhasil! Silakan login.
+              Registrasi berhasil! Link verifikasi telah dikirim ke email Anda.
             </p>
           )}
 

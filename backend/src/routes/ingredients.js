@@ -2,6 +2,7 @@ const express = require('express');
 const {
   createIngredientHandler,
   getAllIngredientsHandler,
+  getIngredientByIdHandler,
   updateIngredientHandler,
   deleteIngredientHandler,
   getLowStockIngredientsHandler
@@ -20,7 +21,10 @@ router.use(authenticate, requireAdmin);
 
 router.post('/', validate(createIngredientSchema), createIngredientHandler);
 router.get('/', getAllIngredientsHandler);
+// Low stock endpoint should be defined before the generic :id route to avoid route shadowing
 router.get('/low-stock', getLowStockIngredientsHandler);
+// New endpoint: fetch a single ingredient by ID (admin only)
+router.get('/:id', getIngredientByIdHandler);
 router.patch('/:id', validate(updateIngredientSchema), updateIngredientHandler);
 router.delete('/:id', deleteIngredientHandler);
 

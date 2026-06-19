@@ -23,6 +23,8 @@ const createMenuSchema = Joi.object({
   description: Joi.string().allow('').default(''),
   imageUrl: Joi.string().allow('').default(''),
   ingredients: Joi.array().items(menuIngredientSchema).default([]),
+  costPrice: Joi.number().min(0).optional(),
+  overheadAllocation: Joi.number().min(0).default(0),
   isAvailable: Joi.boolean().default(true)
 });
 
@@ -32,6 +34,8 @@ const updateMenuSchema = Joi.object({
   description: Joi.string().allow('').optional(),
   imageUrl: Joi.string().allow('').optional(),
   ingredients: Joi.array().items(menuIngredientSchema).optional(),
+  costPrice: Joi.number().min(0).optional(),
+  overheadAllocation: Joi.number().min(0).optional(),
   isAvailable: Joi.boolean().optional()
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update'

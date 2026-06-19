@@ -5,7 +5,7 @@ const Admin = require('../models/Admin');
 const RefreshToken = require('../models/RefreshToken');
 const AuthLog = require('../models/AuthLog');
 const { AppError, BusinessError } = require('../errors/AppError');
-const { sendVerificationEmail, sendPasswordResetEmail, sendPasswordChangedEmail, initializeEmailService } = require('./emailService');
+const { sendVerificationEmail, sendVerificationSuccessEmail, sendPasswordResetEmail, sendPasswordChangedEmail, initializeEmailService } = require('./emailService');
 
 // Initialize email service on load
 initializeEmailService();
@@ -85,6 +85,13 @@ async function verifyAdminEmail(token) {
   await admin.save();
 
   await logAuthEvent('EMAIL_VERIFIED', admin.email, 'SUCCESS', null, null, admin._id.toString());
+
+  // Send welcome/login email
+  try {
+    await sendVerificationSuccessEmail(admin.email);
+  } catch (err) {
+    console.error('Failed to send verification success email:', err);
+  }
 
   return admin;
 }

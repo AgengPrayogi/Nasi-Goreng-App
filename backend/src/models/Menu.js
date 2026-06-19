@@ -15,7 +15,12 @@ const MenuSchema = new mongoose.Schema(
     description: { type: String, default: '' },
     imageUrl: { type: String, default: '' },
     isAvailable: { type: Boolean, default: true },
-    ingredients: { type: [MenuIngredientSchema], default: [] }
+    ingredients: { type: [MenuIngredientSchema], default: [] },
+    costPrice: { type: Number, default: 0, min: 0 },
+    overheadAllocation: { type: Number, default: 0, min: 0 },
+    profitMargin: { type: Number, default: 0 },
+    foodCostPercent: { type: Number, default: 0 },
+    lastCostUpdate: { type: Date, required: false }
   },
   { timestamps: true }
 );

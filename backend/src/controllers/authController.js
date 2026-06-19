@@ -13,7 +13,7 @@ function getClientIp(req) {
   return req.ip || req.connection.remoteAddress || '0.0.0.0';
 }
 
-async function registerAdminHandler(req, res, next) {
+  async function registerAdminHandler(req, res, next) {
   try {
     const admin = await registerAdmin(req.body, getClientIp(req));
     res.status(201).json({
@@ -21,6 +21,7 @@ async function registerAdminHandler(req, res, next) {
         id: admin._id,
         email: admin.email,
         message: 'Registration successful. Please check your email for verification link.',
+        verificationToken: admin.verificationToken,
         verificationTokenExpiry: admin.verificationTokenExpiry
       }
     });

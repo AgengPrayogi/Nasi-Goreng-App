@@ -76,6 +76,42 @@ If you have orders created before Phase 1 fields existed, run once:
 cd backend && MONGODB_URI="..." node scripts/migrate-orders-phase1.js
 ```
 
+## Phase 2 — Business Intelligence
+
+Phase 2 turns operational data into restaurant decisions: daily KPI, menu margin, kitchen efficiency, customer segments, payment mix, and stock risk.
+
+### Cost fields for profitability
+
+- `Ingredient.costPerUnit`: estimated purchase cost per `gram`, `ml`, or `pcs`.
+- `Menu.costPrice`: total ingredient cost per portion.
+- `Menu.overheadAllocation`: optional operational cost allocation per menu portion.
+- `Menu.profitMargin` and `Menu.foodCostPercent`: recalculated when menu cost data changes.
+
+For existing menus, run:
+
+```bash
+cd backend && MONGODB_URI="..." npm run migrate:menu-costs
+```
+
+### BI endpoints
+
+All BI endpoints require admin JWT.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/analytics/dashboard` | One-call BI dashboard: KPI, trends, payment mix, menu profit, kitchen efficiency, customer segments, low-stock items |
+| GET | `/api/analytics/kpi?period=today\|week\|month\|custom&from=&to=` | Revenue, order count, AOV, completion/payment rates |
+| GET | `/api/analytics/trends?period=daily\|hourly&from=&to=` | Time-series KPI data |
+| GET | `/api/analytics/hourly-distribution?date=YYYY-MM-DD` | Peak hours for staffing decisions |
+| GET | `/api/analytics/payment-breakdown?from=&to=` | Payment method and payment status distribution |
+| GET | `/api/analytics/menu-cost` | Menu cost breakdown from ingredients |
+| GET | `/api/analytics/menu-profit?from=&to=&sort=profit\|margin` | Menu revenue, COGS, profit, margin, and recommendation |
+| GET | `/api/analytics/kitchen-efficiency?from=&to=` | Prep/wait time and ETA on-time rate |
+| GET | `/api/analytics/customer-segment?from=&to=` | Value-based customer spending buckets |
+| GET | `/api/analytics/operations/staff-performance?from=&to=` | Staff completion and revenue ranking |
+
+Legacy Phase 2 intelligence endpoints remain available under `/api/analytics/profitability/*`, `/api/analytics/customer-*`, `/api/analytics/rfm-analysis`, and `/api/analytics/forecasting/*`.
+
 ## Endpoints (summary)
 
 | Method | Path | Auth | Description |
@@ -106,11 +142,35 @@ cd backend && MONGODB_URI="..." node scripts/migrate-orders-phase1.js
 | POST | `/api/stock-movements/adjustment` | Admin | Adjustment |
 | GET | `/api/reports/sales` | Admin | Sales summary |
 | GET | `/api/reports/top-menus` | Admin | Top menus |
+| GET | `/api/analytics/dashboard` | Admin | Complete BI dashboard |
+| GET | `/api/analytics/menu-profit` | Admin | Menu profit and margin |
+| GET | `/api/analytics/kitchen-efficiency` | Admin | Kitchen efficiency |
+| GET | `/api/analytics/customer-segment` | Admin | Customer value segments |
+| GET | `/api/invoices/order/:orderCode` | Tidak | Download PDF faktur (publik) |
+| GET | `/api/invoices/preview/order/:orderCode` | Tidak | Preview PDF faktur (base64) |
+| GET | `/api/invoices/admin/orders/:id` | Admin | Download PDF faktur (admin) |
 
-## Frontend & gateway pembayaran
+## Payment Gateway (Fase 2)
 
-- **Rencana UI:** `docs/FRONTEND_PLAN.md`.
-- **Gateway (Fase 2):** setelah frontend stabil; belum diimplementasi di backend ini.
+- `POST /api/payments/create` — create a new payment record for an order (`orderId`, `method`, `amount`). Returns `externalPaymentId`, `expiresAt`, and payment instructions.
+- `GET /api/payments/order/:orderCode` — public lookup of payment by `orderCode`.
+- `GET /api/payments` — admin list with filters (`status`, `method`, `orderCode`, `page`, `limit`).
+- `POST /api/payments/webhook` — gateway webhook to update payment status (`paid`, `failed`, `expired`, `cancelled`). Secured by optional `PAYMENT_WEBHOOK_SECRET` via header `x-webhook-secret` / `x-payment-secret`.
+
+Payment model statuses: `pending`, `paid`, `failed`, `expired`, `cancelled`.
+Payment methods: `cash`, `transfer`, `qris_static`.
+
+Public track (`GET /api/orders/track/:orderCode`) still returns `paymentStatus` and `paymentMethod` from the order document.
+
+## Phase 3 — Invoice PDF (tanpa thermal printer)
+
+Semua bukti pembayaran kini berbentuk **PDF**.
+
+- `GET /api/invoices/order/:orderCode` — download PDF faktur publik (tidak perlu login).
+- `GET /api/invoices/preview/order/:orderCode` — kembalikan PDF sebagai base64 data URL (untuk preview).
+- `GET /api/invoices/admin/orders/:id` — download PDF faktur untuk admin (wajib login).
+
+PDF berisi header, detail pesanan, rincian item, total, dan info pembayaran.
 
 ## Error shape
 
@@ -134,4 +194,6 @@ npm run dev
 npm test
 # Optional migration for legacy orders collection:
 # MONGODB_URI=... node scripts/migrate-orders-phase1.js
+# Optional BI cost recalculation:
+# MONGODB_URI=... npm run migrate:menu-costs
 ```

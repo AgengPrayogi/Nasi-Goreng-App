@@ -11,13 +11,14 @@ const {
   updateMenuSchema
 } = require('../validators/menuValidator');
 const { authenticate, requireAdmin } = require('../middlewares/auth');
-
 const router = express.Router();
 
 // Public endpoint for frontend: get available menus
 router.get('/', getAllMenusHandler);
+// Public endpoint used by tests: /public returns same data
+router.get('/public', getAllMenusHandler);
 
-// Admin-only for managing menus
+// Admin-only: manage and view menus
 router.use(authenticate, requireAdmin);
 
 router.post('/', validate(createMenuSchema), createMenuHandler);

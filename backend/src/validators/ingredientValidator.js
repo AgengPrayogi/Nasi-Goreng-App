@@ -6,6 +6,7 @@ const createIngredientSchema = Joi.object({
     'any.required': 'Ingredient name is required'
   }),
   unit: Joi.string().valid('gram', 'ml', 'pcs').default('pcs'),
+  costPerUnit: Joi.number().min(0).default(0),
   currentStock: Joi.number().min(0).default(0),
   minimumStock: Joi.number().min(0).default(0)
 });
@@ -13,6 +14,7 @@ const createIngredientSchema = Joi.object({
 const updateIngredientSchema = Joi.object({
   name: Joi.string().trim().optional(),
   unit: Joi.string().valid('gram', 'ml', 'pcs').optional(),
+  costPerUnit: Joi.number().min(0).optional(),
   currentStock: Joi.number().min(0).optional(),
   minimumStock: Joi.number().min(0).optional()
 }).min(1).messages({

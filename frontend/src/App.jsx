@@ -16,6 +16,20 @@ import TrackOrderPage from './pages/TrackOrderPage.jsx'
 import VerifyEmailPage from './pages/VerifyEmailPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import AdminRegister from './pages/AdminRegister.jsx'
+import PaymentPage from './pages/PaymentPage.jsx'
+import AlertsPage from './pages/AlertsPage.jsx'
+import ProfitabilityPage from './pages/ProfitabilityPage.jsx'
+import AnalyticsPage from './pages/AnalyticsPage.jsx'
+import CustomerIntelligencePage from './pages/CustomerIntelligencePage.jsx'
+import ForecastingPage from './pages/ForecastingPage.jsx'
+import InventoryAnalyticsPage from './pages/InventoryAnalyticsPage.jsx'
+import FinancialAnalyticsPage from './pages/FinancialAnalyticsPage.jsx'
+import CampaignsPage from './pages/CampaignsPage.jsx'
+import AdminStaffPage from './pages/AdminStaffPage.jsx'
+import AdminCustomersPage from './pages/AdminCustomersPage.jsx'
+import AdminSuppliersPage from './pages/AdminSuppliersPage.jsx'
+import AdminPurchaseOrdersPage from './pages/AdminPurchaseOrdersPage.jsx'
+import AdminReconciliationPage from './pages/AdminReconciliationPage.jsx'
 
 function App() {
   const isAuthenticated = !!localStorage.getItem('jwt')
@@ -25,6 +39,7 @@ function App() {
       <Route path="/" element={<HomePage />} />
       <Route path="/order" element={<PublicOrderPage />} />
       <Route path="/track" element={<TrackOrderPage />} />
+      <Route path="/payment/:orderCode" element={<PaymentPage />} />
       <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
 
       {/* Admin routes */}
@@ -45,6 +60,23 @@ function App() {
         <Route path="reports" element={<ReportsPage />} />
         <Route path="stock-movements" element={<StockMovementsPage />} />
         <Route path="finance" element={<FinancePage />} />
+        <Route path="alerts" element={<AlertsPage />} />
+
+        {/* Phase 1 Admin */}
+        <Route path="staff" element={<AdminStaffPage />} />
+        <Route path="customers" element={<AdminCustomersPage />} />
+        <Route path="suppliers" element={<AdminSuppliersPage />} />
+        <Route path="purchase-orders" element={<AdminPurchaseOrdersPage />} />
+        <Route path="reconciliation" element={<AdminReconciliationPage />} />
+
+        {/* Business Intelligence */}
+        <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="analytics/profitability" element={<ProfitabilityPage />} />
+        <Route path="analytics/customers" element={<CustomerIntelligencePage />} />
+        <Route path="analytics/forecasting" element={<ForecastingPage />} />
+        <Route path="analytics/inventory" element={<InventoryAnalyticsPage />} />
+        <Route path="analytics/financial" element={<FinancialAnalyticsPage />} />
+        <Route path="analytics/campaigns" element={<CampaignsPage />} />
       </Route>
 
       {/* Catch-all redirect to home */}

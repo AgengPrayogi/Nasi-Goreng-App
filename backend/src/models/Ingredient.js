@@ -4,6 +4,7 @@ const IngredientSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     unit: { type: String, enum: ['gram', 'ml', 'pcs'], default: 'pcs' },
+    costPerUnit: { type: Number, default: 0, min: 0 },
     currentStock: { type: Number, default: 0, min: 0 },
     minimumStock: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true }

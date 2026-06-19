@@ -56,7 +56,18 @@ const OrderSchema = new mongoose.Schema(
       default: 'pending',
       enum: ['pending', 'confirmed', 'completed', 'cancelled']
     },
-    notes: { type: String, default: '' }
+    notes: { type: String, default: '' },
+    // Phase 1 - Staff tracking
+    confirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', required: false },
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', required: false },
+    modifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff', required: false },
+    // Phase 1 - Customer CRM
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: false },
+    // Phase 1 - Discounts & Promotions
+    promoCodeUsed: { type: String, default: '', trim: true },
+    discountAmount: { type: Number, default: 0, min: 0 },
+    discountPercentage: { type: Number, default: 0, min: 0, max: 100 },
+    amountAfterDiscount: { type: Number, default: 0, min: 0 }
   },
   { timestamps: true }
 );
@@ -68,5 +79,9 @@ OrderSchema.index({ 'items.menu': 1 });
 OrderSchema.index({ queueDate: 1, queueNumber: 1 });
 OrderSchema.index({ queueDate: 1, kitchenStatus: 1, status: 1 });
 OrderSchema.index({ channel: 1, status: 1 });
+// Staff tracking indexes
+OrderSchema.index({ confirmedBy: 1, createdAt: -1 });
+OrderSchema.index({ completedBy: 1, createdAt: -1 });
+OrderSchema.index({ modifiedBy: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Order', OrderSchema);

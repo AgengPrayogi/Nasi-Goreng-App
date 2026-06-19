@@ -1,0 +1,338 @@
+.admin-reconciliation-page {
+  animation: fadeIn 0.3s ease;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--gray-300);
+  background: var(--white);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  background: var(--gray-100);
+}
+
+.tab.active {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+
+.alert-error {
+  background: #fff0f0;
+  color: var(--red);
+  border: 1px solid var(--red);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.form-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.form-card h2 {
+  margin-top: 0;
+  color: var(--black);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  color: var(--gray-700);
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--red);
+}
+
+.date-input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.close-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--gray-200);
+}
+
+.reconciliation-result {
+  animation: fadeIn 0.3s ease;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.result-item {
+  background: var(--gray-50);
+  padding: 0.75rem;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.result-item .label {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.result-item .value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--black);
+}
+
+.closed-status {
+  background: #e8f5e9;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.closed-status p {
+  margin: 0.25rem 0;
+  color: #2e7d32;
+}
+
+.no-data {
+  text-align: center;
+  padding: 2rem;
+  color: var(--gray-500);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+}
+
+/* History, Trend, Health, Monthly shared */
+.date-range-filter {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.date-range-filter input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.month-input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.summary-card .label {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.summary-card .value {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: var(--red);
+}
+
+.history-table,
+.trend-table,
+.monthly-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.history-table th,
+.trend-table th,
+.monthly-detail-table th {
+  background: var(--black);
+  color: var(--white);
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.history-table td,
+.trend-table td,
+.monthly-detail-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--gray-200);
+  font-size: 0.9rem;
+}
+
+.history-table tr:hover td,
+.trend-table tr:hover td,
+.monthly-detail-table tr:hover td {
+  background: #fff8e1;
+}
+
+/* Health Metrics */
+.health-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.metric-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 1.25rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+
+.metric-card .label {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.metric-card .value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--black);
+}
+
+.metric-card .risk-level {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 0.5rem;
+}
+
+.metric-card.highlight {
+  border: 2px solid var(--red);
+}
+
+.metric-card.highlight .value {
+  color: var(--red);
+}
+
+/* Monthly Summary */
+.monthly-summary {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.monthly-summary h3 {
+  margin: '0 0 1rem';
+  color: var(--black);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.summary-item {
+  background: var(--gray-50);
+  padding: 0.75rem;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.summary-item .label {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.summary-item .value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--red);
+}

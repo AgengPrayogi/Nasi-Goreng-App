@@ -20,11 +20,16 @@ function assertRequiredEnv() {
   }
 }
 
+const { initializeDefaultConfigs } = require('./src/services/alertService');
+
 async function start() {
   try {
     assertRequiredEnv();
     const conn = await connectDB();
     console.log(`MongoDB connected: ${conn.host}:${conn.port}/${conn.name}`);
+
+    // Initialize default alert configurations
+    await initializeDefaultConfigs();
 
     app.listen(PORT, () => {
       console.log(`Server listening on http://localhost:${PORT}`);

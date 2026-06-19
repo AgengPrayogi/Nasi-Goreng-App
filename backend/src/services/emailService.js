@@ -32,7 +32,7 @@ function initializeEmailService() {
 }
 
 function getVerificationEmailTemplate(email, token, frontendUrl) {
-  const verificationLink = `${frontendUrl}/verify-email?token=${token}`;
+  const verificationLink = `${frontendUrl}/verify-email/${token}`;
   return {
     subject: '🍜 Nasi Goreng Polonia - Verify Your Email',
     html: `
@@ -116,6 +116,47 @@ function getPasswordResetEmailTemplate(email, token, frontendUrl) {
   };
 }
 
+function getVerificationSuccessEmailTemplate(email) {
+  const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  return {
+    subject: '🍜 Nasi Goreng Polonia - Email Verified Successfully',
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; background: #f5f5f5; }
+            .container { max-width: 600px; margin: 20px auto; background: white; padding: 30px; border-radius: 8px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .logo { font-size: 24px; color: #d4410e; font-weight: bold; }
+            .button { display: inline-block; background: #d4410e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+            .success { background: #d4edda; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0; }
+            .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">🍜 Nasi Goreng Polonia</div>
+            </div>
+            <h2>Email Verified!</h2>
+            <div class="success">
+              ✓ Your email has been verified successfully.
+            </div>
+            <p>You can now log in to your admin account.</p>
+            <a href="${loginUrl}/admin/login" class="button">Login to Admin Panel</a>
+            <div class="footer">
+              <p>&copy; 2026 Nasi Goreng Polonia. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `Email verified! Login at: ${loginUrl}/admin/login`
+  };
+}
+
 function getPasswordChangedEmailTemplate(email) {
   return {
     subject: '🍜 Nasi Goreng Polonia - Password Changed',
@@ -174,6 +215,25 @@ async function sendVerificationEmail(email, token) {
   }
 }
 
+async function sendVerificationSuccessEmail(email) {
+  if (!transporter) initializeEmailService();
+  
+  const template = getVerificationSuccessEmailTemplate(email);
+  
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || 'noreply@nasiggorengpolonia.id',
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
+  } catch (err) {
+    console.error('Error sending verification success email:', err);
+    // Don't throw - verification is already done
+  }
+}
+
 async function sendPasswordResetEmail(email, token) {
   if (!transporter) initializeEmailService();
   
@@ -216,6 +276,7 @@ async function sendPasswordChangedEmail(email) {
 module.exports = {
   initializeEmailService,
   sendVerificationEmail,
+  sendVerificationSuccessEmail,
   sendPasswordResetEmail,
   sendPasswordChangedEmail
 };

@@ -3,11 +3,12 @@ const Menu = require('../models/Menu');
 const { BusinessError, NotFoundError } = require('../errors/AppError');
 
 async function createIngredient(data) {
-  const { name, unit = 'pcs', currentStock = 0, minimumStock = 0 } = data;
+  const { name, unit = 'pcs', costPerUnit = 0, currentStock = 0, minimumStock = 0 } = data;
 
   const ingredient = new Ingredient({
     name: name.trim(),
     unit,
+    costPerUnit,
     currentStock,
     minimumStock
   });
@@ -33,7 +34,7 @@ async function updateIngredient(id, data) {
     throw new NotFoundError('Ingredient');
   }
 
-  const { name, unit, currentStock, minimumStock } = data;
+  const { name, unit, costPerUnit, currentStock, minimumStock } = data;
 
   // INVARIANT: Cannot update currentStock directly via API
   if (currentStock !== undefined) {
@@ -48,6 +49,7 @@ async function updateIngredient(id, data) {
   }
 
   if (unit !== undefined) ingredient.unit = unit;
+  if (costPerUnit !== undefined) ingredient.costPerUnit = costPerUnit;
   if (minimumStock !== undefined) ingredient.minimumStock = minimumStock;
 
   try {

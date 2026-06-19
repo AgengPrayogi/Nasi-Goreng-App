@@ -2,8 +2,39 @@ const Menu = require('../models/Menu');
 const Ingredient = require('../models/Ingredient');
 const { BusinessError, NotFoundError } = require('../errors/AppError');
 
+function applyMenuCostMetrics(menu) {
+  const price = Number(menu.price || 0);
+  const costPrice = Number(menu.costPrice || 0);
+  menu.profitMargin = price > 0 ? Math.round(((price - costPrice) / price) * 10000) / 100 : 0;
+  menu.foodCostPercent = price > 0 ? Math.round((costPrice / price) * 10000) / 100 : 0;
+  menu.lastCostUpdate = new Date();
+}
+
+async function calculateIngredientCost(ingredients = []) {
+  if (!ingredients.length) return 0;
+
+  const ingredientIds = ingredients.map((ing) => ing.ingredient).filter(Boolean);
+  const records = await Ingredient.find({ _id: { $in: ingredientIds }, isActive: true })
+    .select('costPerUnit')
+    .lean();
+  const costMap = new Map(records.map((ing) => [ing._id.toString(), Number(ing.costPerUnit || 0)]));
+
+  return ingredients.reduce((sum, ing) => {
+    const unitCost = costMap.get(ing.ingredient.toString()) || 0;
+    return sum + (Number(ing.quantity || 0) * unitCost);
+  }, 0);
+}
+
 async function createMenu(data) {
-  const { name, price, description = '', imageUrl = '', ingredients = [], isAvailable = true } = data;
+  const {
+    name,
+    price,
+    description = '',
+    imageUrl = '',
+    ingredients = [],
+    isAvailable = true,
+    overheadAllocation = 0
+  } = data;
 
   // Validate all ingredients exist and are active
   if (ingredients && ingredients.length > 0) {
@@ -30,8 +61,11 @@ async function createMenu(data) {
     description,
     imageUrl,
     ingredients,
-    isAvailable
+    isAvailable,
+    costPrice: data.costPrice !== undefined ? data.costPrice : await calculateIngredientCost(ingredients),
+    overheadAllocation
   });
+  applyMenuCostMetrics(menu);
 
   // INVARIANT: Cannot set isAvailable=true if any ingredient has currentStock <= 0
   if (isAvailable && ingredients.length > 0) {
@@ -79,6 +113,7 @@ async function updateMenu(id, data) {
 
   if (description !== undefined) menu.description = description;
   if (imageUrl !== undefined) menu.imageUrl = imageUrl;
+  if (data.overheadAllocation !== undefined) menu.overheadAllocation = data.overheadAllocation;
 
   // Validate ingredients if provided
   if (ingredients !== undefined) {
@@ -98,6 +133,12 @@ async function updateMenu(id, data) {
       }
     }
     menu.ingredients = ingredients;
+  }
+
+  if (data.costPrice !== undefined) {
+    menu.costPrice = data.costPrice;
+  } else if (ingredients !== undefined) {
+    menu.costPrice = await calculateIngredientCost(menu.ingredients);
   }
 
   // INVARIANT: Cannot set isAvailable=true if any ingredient has currentStock <= 0
@@ -123,6 +164,7 @@ async function updateMenu(id, data) {
     menu.isAvailable = isAvailable;
   }
 
+  applyMenuCostMetrics(menu);
   await menu.save();
   return menu;
 }
@@ -143,5 +185,7 @@ module.exports = {
   createMenu,
   getAllMenus,
   updateMenu,
-  deleteMenu
+  deleteMenu,
+  calculateIngredientCost,
+  applyMenuCostMetrics
 };

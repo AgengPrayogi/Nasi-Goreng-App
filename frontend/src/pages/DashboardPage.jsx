@@ -1,305 +1,397 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import api from '../api.js'
+import React, { useState, useEffect } from 'react';
+import api from '../api';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, AreaChart, Area, PieChart, Pie, Cell
+} from 'recharts';
 
-export default function DashboardPage() {
-  const [period, setPeriod] = useState('daily')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-  const queryParams = { period }
-  if (startDate) queryParams.startDate = startDate
-  if (endDate) queryParams.endDate = endDate
+function DashboardPage() {
+  const [executiveData, setExecutiveData] = useState(null);
+  const [kpiData, setKpiData] = useState(null);
+  const [trendsData, setTrendsData] = useState(null);
+  const [comparisonsData, setComparisonsData] = useState(null);
+  const [alertsData, setAlertsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [period, setPeriod] = useState('7d');
 
-  // Dashboard summary (orders today, low stock, active kitchen, recent orders)
-  const { data: dashData, isLoading: dashLoading } = useQuery({
-    queryKey: ['dashboard-summary'],
-    queryFn: async () => {
-      const res = await api.get('/dashboard/summary')
-      return res.data?.data
-    },
-    refetchInterval: 30000, // refresh every 30 seconds
-  })
+  useEffect(() => {
+    loadAllData();
+  }, [period]);
 
-  // Finance summary
-  const { data: summaryData, isLoading: summaryLoading } = useQuery({
-    queryKey: ['finance-summary', period, startDate, endDate],
-    queryFn: async () => {
-      const res = await api.get('/finance/summary', { params: queryParams })
-      return res.data
-    },
-  })
-
-  const summary = summaryData?.data
-  const formatPrice = (price) => price != null ? `Rp ${Number(price).toLocaleString('id-ID')}` : '-'
-
-  const handleToday = () => {
-    const today = new Date().toISOString().split('T')[0]
-    setStartDate(today)
-    setEndDate(today)
-  }
-
-  const handleThisMonth = () => {
-    const now = new Date()
-    const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-    const last = now.toISOString().split('T')[0]
-    setStartDate(first)
-    setEndDate(last)
-  }
-
-  const handleThisYear = () => {
-    const now = new Date()
-    const first = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
-    const last = now.toISOString().split('T')[0]
-    setStartDate(first)
-    setEndDate(last)
-  }
-
-  const clearFilter = () => {
-    setStartDate('')
-    setEndDate('')
-  }
-
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: '#f57c00',
-      confirmed: '#1976d2',
-      completed: '#43a047',
-      cancelled: '#e53935',
+  async function loadAllData() {
+    setLoading(true);
+    setError('');
+    try {
+      const [executive, kpi, trends, comparisons, alerts] = await Promise.all([
+        api.get('/dashboard/executive'),
+        api.get('/dashboard/kpi'),
+        api.get(`/dashboard/trends?period=${period}`),
+        api.get('/dashboard/comparisons'),
+        api.get('/dashboard/alerts')
+      ]);
+      setExecutiveData(executive.data.data);
+      setKpiData(kpi.data.data);
+      setTrendsData(trends.data.data);
+      setComparisonsData(comparisons.data.data);
+      setAlertsData(alerts.data.data);
+    } catch (err) {
+      setError('Gagal memuat data dashboard');
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    return colors[status] || 'var(--gray-500)'
   }
 
-  const getKitchenLabel = (status) => {
-    const labels = {
-      none: '-',
-      queued: 'Antri',
-      preparing: 'Masak',
-      ready: 'Siap',
-      served: 'Tersaji',
-    }
-    return labels[status] || status
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="spinner" style={{ width: '40px', height: '40px', borderWidth: '4px', margin: '0 auto' }} />
+          <p style={{ color: 'var(--gray-500)', marginTop: '1rem' }}>Memuat data dashboard...</p>
+        </div>
+      </div>
+    );
   }
+
+  if (error) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div className="card" style={{ border: '2px solid var(--red)', padding: '2rem', display: 'inline-block' }}>
+          <p style={{ color: 'var(--red)', fontWeight: 'bold' }}>{error}</p>
+          <button className="btn btn-red" onClick={loadAllData} style={{ marginTop: '0.5rem' }}>🔄 Coba Lagi</button>
+        </div>
+      </div>
+    );
+  }
+
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
+  };
+
+  const formatPercent = (val) => {
+    const num = Number(val) || 0;
+    return num > 0 ? `+${num}%` : `${num}%`;
+  };
 
   return (
     <div>
-      <div className="page-header">
-        <h2 style={{ margin: 0 }}>📊 Admin Dashboard</h2>
-        <p style={{ margin: '0.25rem 0 0', color: 'var(--gray-500)', fontSize: '0.85rem' }}>
-          Selamat datang di panel admin Nasi Goreng Polonia
-        </p>
+      {/* Page Header */}
+      <div className="page-header" style={{ animation: 'fadeInDown 0.4s ease' }}>
+        <div>
+          <h2 style={{ margin: '0 0 0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            📊 Executive Dashboard
+          </h2>
+          <span style={{ fontSize: '0.85rem', color: 'var(--gray-500)' }}>
+            Real-time overview · {period === '7d' ? '7 hari' : period === '30d' ? '30 hari' : '90 hari'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {['7d', '30d', '90d'].map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`btn btn-sm ${period === p ? 'btn-red' : 'btn-gray'}`}
+            >
+              {p === '7d' ? '7 Hari' : p === '30d' ? '30 Hari' : '90 Hari'}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* === Row 1: Order Stats Cards === */}
-      {dashLoading ? (
-        <div style={{ textAlign: 'center', padding: '2rem' }}><div className="spinner" /></div>
-      ) : (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div className="card" style={{ textAlign: 'center', borderTop: '4px solid #1976d2' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '0.25rem' }}>Orders Hari Ini</div>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1976d2' }}>{dashData?.orderStats?.total || 0}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>total order</div>
-            </div>
-            <div className="card" style={{ textAlign: 'center', borderTop: '4px solid #f57c00' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '0.25rem' }}>Pending</div>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#f57c00' }}>{dashData?.orderStats?.pending || 0}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>menunggu konfirmasi</div>
-            </div>
-            <div className="card" style={{ textAlign: 'center', borderTop: '4px solid #43a047' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '0.25rem' }}>Completed</div>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#43a047' }}>{dashData?.orderStats?.completed || 0}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>selesai hari ini</div>
-            </div>
-            <div className="card" style={{ textAlign: 'center', borderTop: '4px solid #e53935' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '0.25rem' }}>Cancelled</div>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#e53935' }}>{dashData?.orderStats?.cancelled || 0}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>dibatalkan</div>
-            </div>
-            <div className="card" style={{ textAlign: 'center', borderTop: '4px solid var(--yellow)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '0.25rem' }}>Revenue Hari Ini</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--yellow)' }}>{formatPrice(dashData?.orderStats?.totalRevenue)}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>dari completed</div>
-            </div>
-            <div className="card" style={{ textAlign: 'center', borderTop: '4px solid #ff6d00' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)', marginBottom: '0.25rem' }}>🍳 Active Kitchen</div>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ff6d00' }}>{dashData?.activeKitchen || 0}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>sedang dimasak</div>
-            </div>
+      {/* Today's KPI Cards */}
+      {kpiData && (
+        <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
+          <div className="card card-accent-red" style={{ 
+            textAlign: 'center',
+            animation: 'fadeInUp 0.4s ease 0.05s both',
+          }}>
+            <div style={{ fontSize: '2rem' }}>📋</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.25rem' }}>Total Pesanan Hari Ini</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{kpiData.orders.today}</div>
+            <div style={{ fontSize: '0.75rem', color: '#43a047' }}>{kpiData.orders.completed} selesai</div>
           </div>
-
-          {/* === Row 2: Low Stock & Recent Orders === */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', marginBottom: '1.5rem' }}>
-            {/* Low Stock Alerts */}
-            <div className="card">
-              <h3 style={{ color: 'var(--black)', marginBottom: '0.75rem', fontSize: '1rem' }}>
-                ⚠️ Stok Menipis
-              </h3>
-              {dashData?.lowStock?.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {dashData.lowStock.map((item) => (
-                    <div key={item._id} style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '0.5rem', background: '#fff3e0', borderRadius: '4px', fontSize: '0.85rem'
-                    }}>
-                      <span style={{ fontWeight: 600 }}>{item.name}</span>
-                      <span style={{ color: '#e65100' }}>
-                        {item.currentStock} / {item.minimumStock} {item.unit}
-                      </span>
-                    </div>
-                  ))}
-                  <Link to="/admin/ingredients" style={{ fontSize: '0.8rem', color: 'var(--red)', marginTop: '0.25rem' }}>
-                    Kelola Stok →
-                  </Link>
-                </div>
-              ) : (
-                <p style={{ color: '#43a047', fontSize: '0.85rem' }}>✅ Semua stok aman</p>
-              )}
-            </div>
-
-            {/* Recent Orders */}
-            <div className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <h3 style={{ color: 'var(--black)', margin: 0, fontSize: '1rem' }}>🕐 Order Terbaru</h3>
-                <Link to="/admin/orders" className="btn btn-sm btn-gray">Lihat Semua</Link>
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr>
-                      <th>Order Code</th>
-                      <th>Customer</th>
-                      <th>Total</th>
-                      <th>Status</th>
-                      <th>Kitchen</th>
-                      <th>Payment</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dashData?.recentOrders?.length > 0 ? (
-                      dashData.recentOrders.map((order) => (
-                        <tr key={order._id} style={{ cursor: 'pointer' }} onClick={() => window.location.href = `/admin/orders/${order._id}`}>
-                          <td><strong>{order.orderCode}</strong></td>
-                          <td>{order.customerName || '-'}</td>
-                          <td style={{ fontWeight: 600 }}>{formatPrice(order.totalAmount)}</td>
-                          <td>
-                            <span style={{
-                              display: 'inline-block', padding: '2px 8px', borderRadius: '4px',
-                              fontSize: '0.75rem', fontWeight: 600, color: '#fff',
-                              background: getStatusColor(order.status)
-                            }}>
-                              {order.status}
-                            </span>
-                          </td>
-                          <td style={{ fontSize: '0.8rem', color: 'var(--gray-600)' }}>{getKitchenLabel(order.kitchenStatus)}</td>
-                          <td style={{ fontSize: '0.8rem', color: order.paymentStatus === 'paid' ? '#43a047' : '#f57c00' }}>
-                            {order.paymentStatus}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--gray-500)' }}>Belum ada order</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div className="card card-accent-green" style={{ 
+            textAlign: 'center',
+            animation: 'fadeInUp 0.4s ease 0.1s both',
+          }}>
+            <div style={{ fontSize: '2rem' }}>💰</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.25rem' }}>Pendapatan Hari Ini</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#43a047' }}>{formatCurrency(kpiData.revenue.today)}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>Diskon: {formatCurrency(kpiData.revenue.totalDiscount)}</div>
           </div>
-        </>
-      )}
-
-      {/* === Row 3: Finance Summary === */}
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ color: 'var(--black)', marginBottom: '0.75rem', fontSize: '1rem' }}>💰 Ringkasan Keuangan</h3>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'end', marginBottom: '1rem' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--gray-700)', marginBottom: '0.25rem' }}>Period</label>
-            <div style={{ display: 'flex', gap: '0.3rem' }}>
-              <button className={`btn btn-sm ${period === 'daily' ? 'btn-red' : 'btn-gray'}`} onClick={() => setPeriod('daily')}>Daily</button>
-              <button className={`btn btn-sm ${period === 'monthly' ? 'btn-red' : 'btn-gray'}`} onClick={() => setPeriod('monthly')}>Monthly</button>
-              <button className={`btn btn-sm ${period === 'yearly' ? 'btn-red' : 'btn-gray'}`} onClick={() => setPeriod('yearly')}>Yearly</button>
-            </div>
+          <div className="card card-accent-yellow" style={{ 
+            textAlign: 'center',
+            animation: 'fadeInUp 0.4s ease 0.15s both',
+          }}>
+            <div style={{ fontSize: '2rem' }}>📊</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.25rem' }}>Rata-rata Pesanan</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{formatCurrency(kpiData.revenue.avgOrderValue)}</div>
           </div>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label>From</label>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          </div>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label>To</label>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </div>
-          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'end' }}>
-            <button className="btn btn-gray btn-sm" onClick={handleToday}>Today</button>
-            <button className="btn btn-gray btn-sm" onClick={handleThisMonth}>This Month</button>
-            <button className="btn btn-gray btn-sm" onClick={handleThisYear}>This Year</button>
-            <button className="btn btn-gray btn-sm" onClick={clearFilter}>Clear</button>
+          <div className="card card-accent-black" style={{ 
+            textAlign: 'center',
+            animation: 'fadeInUp 0.4s ease 0.2s both',
+          }}>
+            <div style={{ fontSize: '2rem' }}>👥</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)', marginTop: '0.25rem' }}>Pelanggan</div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 'bold' }}>{kpiData.customers.total}</div>
+            <div style={{ fontSize: '0.75rem', color: '#43a047' }}>+{kpiData.customers.newToday} hari ini</div>
           </div>
         </div>
+      )}
 
-        {summaryLoading ? (
-          <div style={{ textAlign: 'center', padding: '1rem' }}><div className="spinner" /></div>
-        ) : (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-              <div style={{ textAlign: 'center', padding: '0.75rem', background: '#e8f5e9', borderRadius: '6px' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>Total Income</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#43a047' }}>{formatPrice(summary?.grandTotal?.totalIncome)}</div>
+      {/* Comparison Cards */}
+      {comparisonsData && (
+        <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
+          <div className="card card-accent-green" style={{ animation: 'fadeInUp 0.4s ease 0.25s both' }}>
+            <h3 style={{ marginBottom: '1rem', color: '#2e7d32' }}>📈 Hari Ini vs Kemarin</h3>
+            <div className="grid-2">
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Pesanan</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{comparisonsData.todayVsYesterday.today.orders}</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: comparisonsData.todayVsYesterday.orderChange >= 0 ? '#43a047' : 'var(--red)' }}>
+                  {formatPercent(comparisonsData.todayVsYesterday.orderChange)}
+                </div>
               </div>
-              <div style={{ textAlign: 'center', padding: '0.75rem', background: '#ffebee', borderRadius: '6px' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>Total Expense</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--red)' }}>{formatPrice(summary?.grandTotal?.totalExpense)}</div>
-              </div>
-              <div style={{ textAlign: 'center', padding: '0.75rem', background: '#fff3e0', borderRadius: '6px' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--gray-500)' }}>Net Profit</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: (summary?.grandTotal?.netProfit || 0) >= 0 ? '#43a047' : 'var(--red)' }}>
-                  {formatPrice(summary?.grandTotal?.netProfit)}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Pendapatan</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{formatCurrency(comparisonsData.todayVsYesterday.today.revenue)}</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: comparisonsData.todayVsYesterday.revenueChange >= 0 ? '#43a047' : 'var(--red)' }}>
+                  {formatPercent(comparisonsData.todayVsYesterday.revenueChange)}
                 </div>
               </div>
             </div>
-
-            {summary?.periods?.length > 0 && (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr>
-                      <th>Period</th>
-                      <th>Income</th>
-                      <th>Expense</th>
-                      <th>Net Profit</th>
-                      <th>Transactions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.periods.map((p) => (
-                      <tr key={p.period}>
-                        <td><strong>{p.period}</strong></td>
-                        <td style={{ color: '#43a047', fontWeight: 'bold' }}>{formatPrice(p.totalIncome)}</td>
-                        <td style={{ color: 'var(--red)', fontWeight: 'bold' }}>{formatPrice(p.totalExpense)}</td>
-                        <td style={{ fontWeight: 'bold', color: p.netProfit >= 0 ? '#43a047' : 'var(--red)' }}>
-                          {formatPrice(p.netProfit)}
-                        </td>
-                        <td>{p.incomeCount + p.expenseCount}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          </div>
+          <div className="card card-accent-yellow" style={{ animation: 'fadeInUp 0.4s ease 0.3s both' }}>
+            <h3 style={{ marginBottom: '1rem', color: 'var(--yellow-dark)' }}>📊 Minggu Ini vs Minggu Lalu</h3>
+            <div className="grid-2">
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Pesanan</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{comparisonsData.thisWeekVsLastWeek.thisWeek.orders}</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: comparisonsData.thisWeekVsLastWeek.orderChange >= 0 ? '#43a047' : 'var(--red)' }}>
+                  {formatPercent(comparisonsData.thisWeekVsLastWeek.orderChange)}
+                </div>
               </div>
-            )}
-          </>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--gray-500)' }}>Pendapatan</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{formatCurrency(comparisonsData.thisWeekVsLastWeek.thisWeek.revenue)}</div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 600, color: comparisonsData.thisWeekVsLastWeek.revenueChange >= 0 ? '#43a047' : 'var(--red)' }}>
+                  {formatPercent(comparisonsData.thisWeekVsLastWeek.revenueChange)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revenue Trend Chart */}
+      {trendsData && trendsData.revenue && trendsData.revenue.length > 0 && (
+        <div className="card" style={{ marginBottom: '1.5rem', animation: 'fadeInUp 0.4s ease 0.35s both' }}>
+          <h3 style={{ marginBottom: '1rem' }}>📈 Revenue Trend</h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={trendsData.revenue}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--gray-200)' }} />
+              <Legend />
+              <Line type="monotone" dataKey="revenue" stroke="#0088FE" name="Revenue" strokeWidth={2} />
+              <Line type="monotone" dataKey="orders" stroke="#00C49F" name="Orders" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Top Products & Top Customers */}
+      <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
+        {executiveData && executiveData.topProducts && (
+          <div className="card" style={{ animation: 'fadeInUp 0.4s ease 0.4s both' }}>
+            <h3 style={{ marginBottom: '1rem' }}>🏆 Top 10 Produk (30 hari)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={executiveData.topProducts}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--gray-200)' }} />
+                <Bar dataKey="totalRevenue" fill="#0088FE" name="Revenue" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {executiveData && executiveData.topCustomers && (
+          <div className="card" style={{ animation: 'fadeInUp 0.4s ease 0.45s both' }}>
+            <h3 style={{ marginBottom: '1rem' }}>👑 Top 5 Pelanggan</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nama</th>
+                    <th>Total Order</th>
+                    <th>Total Belanja</th>
+                    <th>Tier</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {executiveData.topCustomers.map((c, idx) => (
+                    <tr key={idx}>
+                      <td><strong>{c.name || c.phone}</strong></td>
+                      <td>{c.totalOrders}</td>
+                      <td><strong>{formatCurrency(c.totalSpent)}</strong></td>
+                      <td>
+                        <span className={`badge ${
+                          c.tier === 'gold' ? 'badge-yellow' :
+                          c.tier === 'silver' ? '' :
+                          'badge-gray'
+                        }`} style={c.tier === 'silver' ? { background: '#C0C0C0', color: '#fff' } : {}}>
+                          {c.tier}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Quick Actions */}
-      <div className="card">
-        <h3 style={{ color: 'var(--black)', marginBottom: '0.75rem', fontSize: '1rem' }}>⚡ Quick Actions</h3>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <Link to="/admin/orders/new" className="btn btn-red">+ Buat Order Baru</Link>
-          <Link to="/admin/kitchen" className="btn btn-yellow">🍳 Lihat Dapur</Link>
-          <Link to="/admin/finance" className="btn btn-gray">💰 Kelola Keuangan</Link>
-          <Link to="/admin/reports" className="btn btn-gray">📊 Laporan</Link>
-        </div>
+      {/* Staff Performance & Alerts */}
+      <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
+        {executiveData && executiveData.staffPerformance && (
+          <div className="card" style={{ animation: 'fadeInUp 0.4s ease 0.5s both' }}>
+            <h3 style={{ marginBottom: '1rem' }}>👨‍🍳 Kinerja Staff Hari Ini</h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={executiveData.staffPerformance}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--gray-200)' }} />
+                <Bar dataKey="ordersCompleted" fill="#00C49F" name="Pesanan Selesai" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {alertsData && alertsData.alerts && (
+          <div className="card" style={{ animation: 'fadeInUp 0.4s ease 0.55s both' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>🔔 Alert Terkini</h3>
+              <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.75rem' }}>
+                <span className="badge badge-red">{alertsData.counts.critical} Critical</span>
+                <span style={{ background: '#ff9800', color: '#fff', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>{alertsData.counts.warning} Warning</span>
+                <span style={{ background: '#2196f3', color: '#fff', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>{alertsData.counts.info} Info</span>
+              </div>
+            </div>
+            <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+              {alertsData.alerts.slice(0, 8).map((alert, idx) => (
+                <div key={idx} style={{
+                  padding: '0.6rem',
+                  marginBottom: '0.4rem',
+                  borderRadius: '6px',
+                  borderLeft: `4px solid ${
+                    alert.severity === 'critical' ? 'var(--red)' :
+                    alert.severity === 'warning' ? '#ff9800' :
+                    '#2196f3'
+                  }`,
+                  background: alert.severity === 'critical' ? '#fff0f0' :
+                    alert.severity === 'warning' ? '#fff8e1' :
+                    '#e3f2fd',
+                }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{alert.title}</div>
+                  <div style={{ color: 'var(--gray-500)', fontSize: '0.8rem' }}>{alert.message}</div>
+                  <div style={{ color: 'var(--gray-400)', fontSize: '0.7rem', marginTop: '0.2rem' }}>
+                    {new Date(alert.createdAt).toLocaleString('id-ID')}
+                    {!alert.acknowledged && <span style={{ color: '#e65100', marginLeft: '0.5rem' }}>● Belum diakui</span>}
+                  </div>
+                </div>
+              ))}
+              {alertsData.alerts.length === 0 && (
+                <p style={{ textAlign: 'center', color: 'var(--gray-400)', padding: '2rem' }}>
+                  ✅ Tidak ada alert
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Hourly Trend */}
+      {trendsData && trendsData.hourlyTrend && trendsData.hourlyTrend.length > 0 && (
+        <div className="card" style={{ marginBottom: '1.5rem', animation: 'fadeInUp 0.4s ease 0.6s both' }}>
+          <h3 style={{ marginBottom: '1rem' }}>⏰ Distribusi Pesanan Per Jam (Hari Ini)</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <AreaChart data={trendsData.hourlyTrend}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="hour" />
+              <YAxis />
+              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--gray-200)' }} />
+              <Area type="monotone" dataKey="orders" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} name="Pesanan" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Status Distribution & Payment Distribution */}
+      {trendsData && (
+        <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
+          {trendsData.statusDistribution && (
+            <div className="card" style={{ animation: 'fadeInUp 0.4s ease 0.65s both' }}>
+              <h3 style={{ marginBottom: '1rem' }}>📊 Distribusi Status Pesanan</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={trendsData.statusDistribution}
+                    cx="50%"
+                    cy="50%"
+                    labelLine
+                    label={({ _id, count }) => `${_id}: ${count}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="count"
+                    nameKey="_id"
+                  >
+                    {trendsData.statusDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--gray-200)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {trendsData.paymentDistribution && (
+            <div className="card" style={{ animation: 'fadeInUp 0.4s ease 0.7s both' }}>
+              <h3 style={{ marginBottom: '1rem' }}>💳 Distribusi Metode Pembayaran</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={trendsData.paymentDistribution}
+                    cx="50%"
+                    cy="50%"
+                    labelLine
+                    label={({ _id, count }) => `${_id}: ${count}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="count"
+                    nameKey="_id"
+                  >
+                    {trendsData.paymentDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid var(--gray-200)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
     </div>
-  )
+  );
 }
+
+export default DashboardPage;

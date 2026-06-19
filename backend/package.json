@@ -9,7 +9,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "NODE_ENV=test jest --runInBand --forceExit",
-    "migrate:orders-phase1": "node scripts/migrate-orders-phase1.js"
+    "migrate:orders-phase1": "node scripts/migrate-orders-phase1.js",
+    "migrate:menu-costs": "node scripts/backfill-menu-costs.js"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -23,7 +24,8 @@
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.19.1",
-    "nodemailer": "^8.0.9"
+    "nodemailer": "^8.0.9",
+    "pdfkit": "^0.19.1"
   },
   "devDependencies": {
     "jest": "^29.7.0",

@@ -3,13 +3,38 @@ const nodemailer = require('nodemailer');
 // Initialize email transporter
 let transporter;
 
-function initializeEmailService() {
-  // For development, use test email or environment variables
-  if (process.env.EMAIL_SERVICE === 'test' || !process.env.SMTP_HOST) {
+async function initializeEmailService() {
+  if (transporter) return; // Already initialized
+
+  // Ethereal email for real SMTP testing
+  if (process.env.EMAIL_SERVICE === 'ethereal') {
+    try {
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass
+        }
+      });
+      console.log('📧 Ethereal email service initialized');
+      console.log('   User:', testAccount.user);
+      console.log('   Pass:', testAccount.pass);
+      console.log('   Test messages URL: https://ethereal.email/messages');
+      return;
+    } catch (err) {
+      console.error('Failed to create Ethereal test account, falling back to mock:', err);
+    }
+  }
+
+  // Mock mode explicitly requested
+  if (process.env.EMAIL_SERVICE === 'mock' || !process.env.SMTP_HOST) {
     // Mock transporter for development/testing
     transporter = {
       sendMail: async (mailOptions) => {
-        console.log('📧 Email would be sent (dev mode):', {
+        console.log('📧 Email would be sent (mock mode):', {
           to: mailOptions.to,
           subject: mailOptions.subject,
           link: mailOptions.html?.match(/href="([^"]+)"/)?.[1] || 'N/A'
@@ -17,17 +42,46 @@ function initializeEmailService() {
         return { messageId: 'mock-' + Date.now() };
       }
     };
-  } else {
-    // Production transporter with real SMTP
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT || 587,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD
+    return;
+  }
+
+  // Production transporter with real SMTP
+  console.log('📬 SMTP Configuration:');
+  console.log('   Host:', process.env.SMTP_HOST);
+  console.log('   Port:', process.env.SMTP_PORT || 587);
+  console.log('   Secure:', process.env.SMTP_SECURE === 'true');
+  console.log('   User:', process.env.SMTP_USER);
+  console.log('   From:', process.env.SMTP_FROM);
+
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT || 587,
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD
+    }
+  });
+
+  // Verify SMTP connection
+  try {
+    await transporter.verify();
+    console.log('✅ SMTP Connection Verified - Server is ready to send emails');
+  } catch (err) {
+    console.error('❌ SMTP Connection Failed:');
+    console.error('   Error:', err.message);
+    console.error('   Check SMTP_HOST, SMTP_USER, and SMTP_PASSWORD');
+    console.error('   Falling back to mock email service for development.');
+    transporter = {
+      sendMail: async (mailOptions) => {
+        console.log('📧 Email would be sent (fallback mock mode):', {
+          to: mailOptions.to,
+          subject: mailOptions.subject,
+          link: mailOptions.html?.match(/href="([^"]+)"/)?.[1] || 'N/A'
+        });
+        return { messageId: 'mock-' + Date.now() };
       }
-    });
+    };
   }
 }
 
@@ -196,27 +250,58 @@ function getPasswordChangedEmailTemplate(email) {
 }
 
 async function sendVerificationEmail(email, token) {
-  if (!transporter) initializeEmailService();
+  if (!transporter) await initializeEmailService();
   
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const template = getVerificationEmailTemplate(email, token, frontendUrl);
   
   try {
-    await transporter.sendMail({
+    console.log('📬 SENDING VERIFICATION EMAIL:');
+    console.log('   To:', email);
+    console.log('   Token:', token);
+    console.log('   Frontend URL:', frontendUrl);
+    console.log('   Email Service Mode:', process.env.EMAIL_SERVICE || 'mock');
+    
+    const result = await transporter.sendMail({
       from: process.env.SMTP_FROM || 'noreply@nasiggorengpolonia.id',
       to: email,
       subject: template.subject,
       html: template.html,
       text: template.text
     });
+    
+    // Log Ethereal preview URL
+    if (process.env.EMAIL_SERVICE === 'ethereal') {
+      const previewUrl = nodemailer.getTestMessageUrl(result);
+      if (previewUrl) {
+        console.log('✅ EMAIL SENT SUCCESSFULLY');
+        console.log('   📬 Ethereal Preview URL:', previewUrl);
+        console.log('   To view this email in your browser, open the URL above.');
+      } else {
+        console.log('✅ EMAIL SENT SUCCESSFULLY (Ethereal)');
+        console.log('   Message ID:', result.messageId);
+      }
+    } else if (process.env.EMAIL_SERVICE === 'mock') {
+      console.log('✅ EMAIL LOGGED (mock mode - no real email sent)');
+    } else {
+      console.log('✅ EMAIL SENT SUCCESSFULLY (SMTP)');
+      console.log('   Message ID:', result.messageId);
+    }
+    
+    return result;
   } catch (err) {
-    console.error('Error sending verification email:', err);
+    console.error('❌ FAILED TO SEND VERIFICATION EMAIL:');
+    console.error('   To:', email);
+    console.error('   Error:', err.message);
+    if (process.env.EMAIL_SERVICE === 'ethereal') {
+      console.error('   Check that EMAIL_SERVICE=ethereal is properly configured.');
+    }
     throw err;
   }
 }
 
 async function sendVerificationSuccessEmail(email) {
-  if (!transporter) initializeEmailService();
+  if (!transporter) await initializeEmailService();
   
   const template = getVerificationSuccessEmailTemplate(email);
   
@@ -235,7 +320,7 @@ async function sendVerificationSuccessEmail(email) {
 }
 
 async function sendPasswordResetEmail(email, token) {
-  if (!transporter) initializeEmailService();
+  if (!transporter) await initializeEmailService();
   
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const template = getPasswordResetEmailTemplate(email, token, frontendUrl);
@@ -255,7 +340,7 @@ async function sendPasswordResetEmail(email, token) {
 }
 
 async function sendPasswordChangedEmail(email) {
-  if (!transporter) initializeEmailService();
+  if (!transporter) await initializeEmailService();
   
   const template = getPasswordChangedEmailTemplate(email);
   

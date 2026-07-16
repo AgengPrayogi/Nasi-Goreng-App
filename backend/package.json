@@ -24,6 +24,7 @@
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.19.1",
+    "mongosh": "^2.8.3",
     "nodemailer": "^8.0.9",
     "pdfkit": "^0.19.1"
   },

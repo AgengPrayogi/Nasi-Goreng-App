@@ -9,9 +9,16 @@ export default function AdminRegister() {
   const [passError, setPassError] = useState('')
 
   const registerMutation = useMutation({
-    mutationFn: (body) => api.post('/auth/register-admin', body),
-    onSuccess: () => {
-      navigate('/admin/login', { replace: true })
+    mutationFn: (body) => {
+      console.log('📤 REGISTER REQUEST PAYLOAD:', JSON.stringify(body));
+      return api.post('/auth/register-admin', body);
+    },
+    onSuccess: (data) => {
+      console.log('✅ REGISTRATION SUCCESS:', JSON.stringify(data.data));
+      navigate('/verify-email-pending', {
+        state: { email: form.email },
+        replace: true
+      });
     },
   })
 
@@ -22,7 +29,7 @@ export default function AdminRegister() {
       setPassError('Password tidak cocok.')
       return
     }
-    registerMutation.mutate({ email: form.email, password: form.password })
+    registerMutation.mutate({ email: form.email, password: form.password, confirmPassword: form.confirmPassword })
   }
 
   return (
@@ -67,8 +74,8 @@ export default function AdminRegister() {
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               required
-              minLength={6}
-              placeholder="Minimal 6 karakter"
+              minLength={8}
+              placeholder="Minimal 8 karakter (huruf besar, kecil, angka, simbol)"
             />
           </div>
           <div className="form-group">
@@ -78,7 +85,7 @@ export default function AdminRegister() {
               value={form.confirmPassword}
               onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
               required
-              minLength={6}
+              minLength={8}
               placeholder="Ulangi password"
             />
           </div>

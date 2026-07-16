@@ -48,7 +48,7 @@ Browsers send `Origin`. Allowed values must appear in `CORS_ORIGINS` in producti
 
 ### Channel & kontak
 
-- `channel`: `walk_in` (default) or `online`.
+- `channel`: `dine_in` (default) or `online`.
 - For `online`, **`customerName`** and **`customerPhone`** are required (validated on create).
 
 ### Antrian & dapur (`kitchenStatus`)

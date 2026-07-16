@@ -27,20 +27,18 @@ async function createOrder(data) {
   const {
     items = [],
     notes = '',
-    channel = 'walk_in',
+    channel = 'dine_in',
     customerName = '',
     customerPhone = ''
   } = data;
 
-  if (channel === 'online') {
-    const name = String(customerName || '').trim();
-    const phone = String(customerPhone || '').trim();
-    if (!name) {
-      throw new BusinessError('Customer name is required for online orders', 'ONLINE_CUSTOMER_REQUIRED');
-    }
-    if (!phone) {
-      throw new BusinessError('Customer phone is required for online orders', 'ONLINE_CUSTOMER_REQUIRED');
-    }
+  const name = String(customerName || '').trim();
+  const phone = String(customerPhone || '').trim();
+  if (!name) {
+    throw new BusinessError('Customer name is required', 'CUSTOMER_NAME_REQUIRED');
+  }
+  if (!phone) {
+    throw new BusinessError('Customer phone is required', 'CUSTOMER_PHONE_REQUIRED');
   }
 
   const orderItems = [];

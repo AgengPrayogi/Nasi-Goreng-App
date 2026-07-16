@@ -26,7 +26,7 @@ async function main() {
     },
     {
       $set: {
-        channel: 'walk_in',
+        channel: 'dine_in',
         customerName: '',
         customerPhone: '',
         kitchenStatus: 'none',

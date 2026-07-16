@@ -14,7 +14,11 @@ const registerAdminSchema = Joi.object({
     .messages({
       'string.pattern.base': 'Password must contain at least 8 characters, including uppercase, lowercase, number, and special character (@$!%*?&)',
       'any.required': 'Password is required'
-    })
+    }),
+  confirmPassword: Joi.string().valid(Joi.ref('password')).required().messages({
+    'any.only': 'Password confirmation does not match password',
+    'any.required': 'Password confirmation is required'
+  })
 });
 
 const loginSchema = Joi.object({

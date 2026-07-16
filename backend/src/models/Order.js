@@ -21,8 +21,8 @@ const OrderSchema = new mongoose.Schema(
     },
     channel: {
       type: String,
-      enum: ['walk_in', 'online'],
-      default: 'walk_in'
+      enum: ['dine_in', 'online'],
+      default: 'dine_in'
     },
     customerName: { type: String, default: '', trim: true },
     customerPhone: { type: String, default: '', trim: true },

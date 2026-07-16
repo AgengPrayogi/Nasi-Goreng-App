@@ -47,33 +47,31 @@ async function setupEnvAndApp() {
   app = require('../src/app');
 }
 
-/** Create a walk-in order and return the response body. */
-async function createWalkInOrder(menuIdent, qty = 1) {
+/** Create a dine-in order and return the response body. */
+async function createDineInOrder(menuIdent, qty = 1) {
   return request(app)
     .post('/api/orders')
     .send({
-      channel: 'walk_in',
+      channel: 'dine_in',
       items: [{ menuId: menuIdent, quantity: qty }]
     });
 }
 
-/** Confirm an order by id (admin). */
-async function confirmOrder(id) {
+// Chain helpers for tests: call .expect() directly on the supertest chain.
+function confirmOrder(id) {
   return request(app)
     .patch(`/api/orders/${id}/confirm`)
     .set('Authorization', `Bearer ${adminToken}`);
 }
 
-/** Advance kitchen status to 'ready'. */
-async function kitchenReady(id) {
+function kitchenReady(id) {
   return request(app)
     .patch(`/api/orders/${id}/kitchen`)
     .set('Authorization', `Bearer ${adminToken}`)
     .send({ kitchenStatus: 'ready' });
 }
 
-/** Mark payment as paid. */
-async function markPaid(id) {
+function markPaid(id) {
   return request(app)
     .patch(`/api/orders/${id}/payment`)
     .set('Authorization', `Bearer ${adminToken}`)
@@ -86,12 +84,15 @@ async function markPaid(id) {
 
 beforeAll(async () => {
   await setupEnvAndApp();
+  process.env.ALLOW_ADMIN_REGISTER = 'true';
 
   // 1. Register first admin
   await request(app)
     .post('/api/auth/register-admin')
-    .send({ email: 'owner@example.com', password: testPassword })
+    .send({ email: 'owner@example.com', password: testPassword, confirmPassword: testPassword })
     .expect(201);
+
+  process.env.ALLOW_ADMIN_REGISTER = 'false';
 
   // 2. Verify email
   const Admin = require('../src/models/Admin');
@@ -149,7 +150,7 @@ describe('Order Edge Cases', () => {
     const res = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in',
+        channel: 'dine_in',
         items: [{ menuId, quantity: 0 }]
       })
       .expect(400);
@@ -161,7 +162,7 @@ describe('Order Edge Cases', () => {
     const res = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in',
+        channel: 'dine_in',
         items: [{ menuId, quantity: -5 }]
       })
       .expect(400);
@@ -174,7 +175,7 @@ describe('Order Edge Cases', () => {
     const res = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in',
+        channel: 'dine_in',
         items: [{ menuId: fakeId, quantity: 1 }]
       })
       .expect(404);
@@ -195,7 +196,7 @@ describe('Order Edge Cases', () => {
     const res = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in',
+        channel: 'dine_in',
         items: [{ menuId: inactiveMenu._id.toString(), quantity: 1 }]
       })
       .expect(400);
@@ -219,7 +220,7 @@ describe('Order Edge Cases', () => {
     const res = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in',
+        channel: 'dine_in',
         items: [{ menuId: tempMenu._id.toString(), quantity: 1 }]
       })
       .expect(404);
@@ -231,7 +232,7 @@ describe('Order Edge Cases', () => {
     const res = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in',
+        channel: 'dine_in',
         items: []
       })
       .expect(400);
@@ -243,7 +244,7 @@ describe('Order Edge Cases', () => {
     const res = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in'
+        channel: 'dine_in'
       })
       .expect(400);
     expect(res.body.errorCode).toBe('VALIDATION_ERROR');
@@ -252,7 +253,7 @@ describe('Order Edge Cases', () => {
   // ---- complete order dua kali ----
   test('cannot complete an already completed order', async () => {
     // Create → confirm → kitchen ready → pay → complete
-    const createRes = await createWalkInOrder(menuId);
+    const createRes = await createDineInOrder(menuId);
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
@@ -276,7 +277,7 @@ describe('Order Edge Cases', () => {
 
   // ---- cancel order yang sudah completed ----
   test('cannot cancel a completed order', async () => {
-    const createRes = await createWalkInOrder(menuId);
+    const createRes = await createDineInOrder(menuId);
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
@@ -297,7 +298,7 @@ describe('Order Edge Cases', () => {
 
   // ---- confirm order yang sudah cancelled ----
   test('cannot confirm a cancelled order', async () => {
-    const createRes = await createWalkInOrder(menuId);
+    const createRes = await createDineInOrder(menuId);
     const oid = createRes.body.data._id;
 
     // Cancel first
@@ -314,7 +315,7 @@ describe('Order Edge Cases', () => {
 
   // ---- confirm order already completed ----
   test('cannot confirm a completed order', async () => {
-    const createRes = await createWalkInOrder(menuId);
+    const createRes = await createDineInOrder(menuId);
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
@@ -332,7 +333,7 @@ describe('Order Edge Cases', () => {
 
   // ---- complete order that is still pending (not confirmed) ----
   test('cannot complete a pending order', async () => {
-    const createRes = await createWalkInOrder(menuId);
+    const createRes = await createDineInOrder(menuId);
     const oid = createRes.body.data._id;
 
     const completeRes = await request(app)
@@ -344,7 +345,7 @@ describe('Order Edge Cases', () => {
 
   // ---- cancel an already cancelled order ----
   test('cancel a cancelled order (idempotent or error)', async () => {
-    const createRes = await createWalkInOrder(menuId);
+    const createRes = await createDineInOrder(menuId);
     const oid = createRes.body.data._id;
 
     await request(app)
@@ -381,7 +382,7 @@ describe('Order Edge Cases', () => {
 
   // ---- kitchen update on non-confirmed order ----
   test('kitchen update on pending order fails', async () => {
-    const createRes = await createWalkInOrder(menuId);
+    const createRes = await createDineInOrder(menuId);
     const oid = createRes.body.data._id;
 
     const res = await request(app)
@@ -394,7 +395,7 @@ describe('Order Edge Cases', () => {
 
   // ---- payment update on completed order ----
   test('payment update on completed order fails', async () => {
-    const createRes = await createWalkInOrder(menuId);
+    const createRes = await createDineInOrder(menuId);
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
@@ -415,7 +416,7 @@ describe('Order Edge Cases', () => {
 
   // ---- payment update on cancelled order ----
   test('payment update on cancelled order fails', async () => {
-    const createRes = await createWalkInOrder(menuId);
+    const createRes = await createDineInOrder(menuId);
     const oid = createRes.body.data._id;
 
     await request(app)
@@ -454,7 +455,7 @@ describe('Order Edge Cases', () => {
     const pedasMenuId = menuRes.body.data._id;
 
     // Create order for 2 portions (needs 200g, but only 1g in stock)
-    const createRes = await createWalkInOrder(pedasMenuId, 2);
+    const createRes = await createDineInOrder(pedasMenuId, 2);
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
@@ -804,7 +805,7 @@ describe('Auth Edge Cases', () => {
     process.env.ALLOW_ADMIN_REGISTER = 'true';
     await request(app)
       .post('/api/auth/register-admin')
-      .send({ email: 'inactive@example.com', password: testPassword })
+      .send({ email: 'inactive@example.com', password: testPassword, confirmPassword: testPassword })
       .expect(201);
     process.env.ALLOW_ADMIN_REGISTER = 'false';
 
@@ -849,7 +850,7 @@ describe('Auth Edge Cases', () => {
     process.env.ALLOW_ADMIN_REGISTER = 'true';
     const res = await request(app)
       .post('/api/auth/register-admin')
-      .send({ email: 'not-an-email', password: testPassword })
+      .send({ email: 'not-an-email', password: testPassword, confirmPassword: testPassword })
       .expect(400);
     process.env.ALLOW_ADMIN_REGISTER = 'false';
     expect(res.body.errorCode).toBe('VALIDATION_ERROR');
@@ -860,7 +861,7 @@ describe('Auth Edge Cases', () => {
     process.env.ALLOW_ADMIN_REGISTER = 'true';
     const res = await request(app)
       .post('/api/auth/register-admin')
-      .send({ email: 'newadmin@example.com', password: 'weak' })
+      .send({ email: 'newadmin@example.com', password: 'weak', confirmPassword: 'weak' })
       .expect(400);
     process.env.ALLOW_ADMIN_REGISTER = 'false';
     expect(res.body.errorCode).toBe('VALIDATION_ERROR');
@@ -872,7 +873,7 @@ describe('Auth Edge Cases', () => {
     process.env.ALLOW_ADMIN_REGISTER = 'true';
     const regRes = await request(app)
       .post('/api/auth/register-admin')
-      .send({ email: 'throwaway@example.com', password: testPassword })
+      .send({ email: 'throwaway@example.com', password: testPassword, confirmPassword: testPassword })
       .expect(201);
     process.env.ALLOW_ADMIN_REGISTER = 'false';
 

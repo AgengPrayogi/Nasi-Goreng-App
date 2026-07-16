@@ -6,6 +6,7 @@ import api from '../api.js'
 export default function AdminLogin() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '' })
+  const [emailNotVerified, setEmailNotVerified] = useState(false)
 
   const loginMutation = useMutation({
     mutationFn: (body) => api.post('/auth/login', body),
@@ -16,10 +17,24 @@ export default function AdminLogin() {
         navigate('/admin/dashboard', { replace: true })
       }
     },
+    onError: (err) => {
+      const errorCode = err?.response?.data?.errorCode
+      const errorMessage = err?.response?.data?.message || ''
+      if (errorCode === 'EMAIL_NOT_VERIFIED' || errorMessage.includes('verify your email')) {
+        setEmailNotVerified(true)
+        // Auto-redirect to verification pending page after a moment
+        setTimeout(() => {
+          navigate('/verify-email-pending', { state: { email: form.email }, replace: true })
+        }, 3000)
+      } else {
+        setEmailNotVerified(false)
+      }
+    },
   })
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    setEmailNotVerified(false)
     loginMutation.mutate(form)
   }
 

@@ -14,6 +14,7 @@ import HomePage from './pages/HomePage.jsx'
 import PublicOrderPage from './pages/PublicOrderPage.jsx'
 import TrackOrderPage from './pages/TrackOrderPage.jsx'
 import VerifyEmailPage from './pages/VerifyEmailPage.jsx'
+import VerifyEmailPendingPage from './pages/VerifyEmailPendingPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import AdminRegister from './pages/AdminRegister.jsx'
 import PaymentPage from './pages/PaymentPage.jsx'
@@ -45,6 +46,7 @@ function App() {
       {/* Admin routes */}
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/register" element={<AdminRegister />} />
+      <Route path="/verify-email-pending" element={<VerifyEmailPendingPage />} />
       <Route
         path="/admin/*"
         element={isAuthenticated ? <Layout /> : <Navigate to="/admin/login" replace />}

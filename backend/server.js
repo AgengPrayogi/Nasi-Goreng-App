@@ -21,6 +21,7 @@ function assertRequiredEnv() {
 }
 
 const { initializeDefaultConfigs } = require('./src/services/alertService');
+const { initializeEmailService } = require('./src/services/emailService');
 
 async function start() {
   try {
@@ -30,6 +31,9 @@ async function start() {
 
     // Initialize default alert configurations
     await initializeDefaultConfigs();
+
+    // Initialize email service at startup (verify SMTP connection early)
+    await initializeEmailService();
 
     app.listen(PORT, () => {
       console.log(`Server listening on http://localhost:${PORT}`);

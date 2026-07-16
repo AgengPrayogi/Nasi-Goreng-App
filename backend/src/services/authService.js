@@ -5,10 +5,7 @@ const Admin = require('../models/Admin');
 const RefreshToken = require('../models/RefreshToken');
 const AuthLog = require('../models/AuthLog');
 const { AppError, BusinessError } = require('../errors/AppError');
-const { sendVerificationEmail, sendVerificationSuccessEmail, sendPasswordResetEmail, sendPasswordChangedEmail, initializeEmailService } = require('./emailService');
-
-// Initialize email service on load
-initializeEmailService();
+const { sendVerificationEmail, sendVerificationSuccessEmail, sendPasswordResetEmail, sendPasswordChangedEmail } = require('./emailService');
 
 async function assertCanRegisterAdmin() {
   const count = await Admin.countDocuments();
@@ -33,7 +30,11 @@ async function generateResetToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-async function registerAdmin({ email, password }, ipAddress) {
+async function registerAdmin(data, ipAddress) {
+  if (!data) {
+    throw new AppError('Request body is required', 400, 'VALIDATION_ERROR');
+  }
+  const { email, password } = data;
   await assertCanRegisterAdmin();
 
   const existing = await Admin.findOne({ email });

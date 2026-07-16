@@ -1,6 +1,6 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
-const app = require('../app');
+const app = require('../src/app');
 
 // This test suite assumes the app is properly configured
 // Tests cover basic Phase 1 functionality

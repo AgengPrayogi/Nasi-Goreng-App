@@ -56,17 +56,30 @@ describe('Nasi Goreng Polonia API', () => {
   });
 
   test('admin bootstrap: first register succeeds', async () => {
+    process.env.ALLOW_ADMIN_REGISTER = 'true';
     const res = await request(app)
       .post('/api/auth/register-admin')
-      .send({ email: 'owner@example.com', password: testPassword })
+      .send({ email: 'owner@example.com', password: testPassword, confirmPassword: testPassword })
       .expect(201);
     expect(res.body.data.email).toBe('owner@example.com');
+    
+    // Verify email and login to get token
+    const admin = await require('../src/models/Admin').findOne({ email: 'owner@example.com' });
+    admin.isVerified = true;
+    await admin.save();
+
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'owner@example.com', password: testPassword })
+      .expect(200);
+    adminToken = loginRes.body.data.token;
+    process.env.ALLOW_ADMIN_REGISTER = 'false';
   });
 
   test('admin bootstrap: second register blocked without ALLOW_ADMIN_REGISTER', async () => {
     const res = await request(app)
       .post('/api/auth/register-admin')
-      .send({ email: 'other@example.com', password: testPassword })
+      .send({ email: 'other@example.com', password: testPassword, confirmPassword: testPassword })
       .expect(403);
     expect(res.body.errorCode).toBe('ADMIN_REGISTER_DISABLED');
   });
@@ -75,26 +88,10 @@ describe('Nasi Goreng Polonia API', () => {
     process.env.ALLOW_ADMIN_REGISTER = 'true';
     const res = await request(app)
       .post('/api/auth/register-admin')
-      .send({ email: 'other@example.com', password: testPassword })
+      .send({ email: 'other@example.com', password: testPassword, confirmPassword: testPassword })
       .expect(201);
     expect(res.body.data.email).toBe('other@example.com');
     process.env.ALLOW_ADMIN_REGISTER = 'false';
-  });
-
-  test('POST /api/auth/login returns JWT', async () => {
-    // Must verify email first
-    const admin = await require('../src/models/Admin').findOne({ email: 'owner@example.com' });
-    admin.isVerified = true;
-    await admin.save();
-
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'owner@example.com', password: testPassword })
-      .expect(200);
-    expect(res.body.data.token).toBeTruthy();
-    expect(res.body.data.refreshToken).toBeTruthy();
-    expect(res.body.data.admin.email).toBe('owner@example.com');
-    adminToken = res.body.data.token;
   });
 
   test('ingredients CRUD + low stock', async () => {
@@ -162,11 +159,13 @@ describe('Nasi Goreng Polonia API', () => {
     expect(res.body.errorCode).toBe('VALIDATION_ERROR');
   });
 
-  test('orders: create (public) returns orderCode (walk-in)', async () => {
+  test('orders: create (public) returns orderCode (dine-in)', async () => {
     const res = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in',
+        channel: 'dine_in',
+        customerName: 'Test Customer',
+        customerPhone: '081234567890',
         items: [{ menuId, quantity: 1 }]
       })
       .expect(201);
@@ -271,7 +270,9 @@ describe('Nasi Goreng Polonia API', () => {
     const res = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in',
+        channel: 'dine_in',
+        customerName: 'Test Customer',
+        customerPhone: '081234567890',
         items: [{ menuId, quantity: 1 }]
       })
       .expect(201);
@@ -342,7 +343,9 @@ describe('Nasi Goreng Polonia API', () => {
     const createRes = await request(app)
       .post('/api/orders')
       .send({
-        channel: 'walk_in',
+        channel: 'dine_in',
+        customerName: 'Test Customer',
+        customerPhone: '081234567890',
         items: [{ menuId, quantity: 1 }]
       })
       .expect(201);

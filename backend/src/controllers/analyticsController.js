@@ -189,6 +189,16 @@ async function customerRecommendationsHandler(req, res, next) {
   }
 }
 
+async function productRecommendationsHandler(req, res, next) {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const data = await customerInsightService.getProductRecommendations(limit);
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function segmentCustomersHandler(req, res, next) {
   try {
     const data = await customerInsightService.getRfmAnalysis();
@@ -233,6 +243,20 @@ async function inventoryPredictionHandler(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+async function ingredientForecastHandler(req, res, next) {
+  try {
+    const data = await forecastingService.getIngredientForecast(req.query);
+    res.json({ data });
+  } catch (err) { next(err); }
+}
+
+async function forecastAccuracyHandler(req, res, next) {
+  try {
+    const data = await forecastingService.getForecastAccuracy(req.query);
+    res.json({ data });
+  } catch (err) { next(err); }
 }
 
 async function upsellOpportunitiesHandler(req, res, next) {
@@ -397,11 +421,14 @@ module.exports = {
   rfmAnalysisHandler,
   customerJourneyHandler,
   customerRecommendationsHandler,
+  productRecommendationsHandler,
   segmentCustomersHandler,
   demandForecastHandler,
   revenueForecastHandler,
   customerChurnHandler,
   inventoryPredictionHandler,
+  ingredientForecastHandler,
+  forecastAccuracyHandler,
   upsellOpportunitiesHandler,
   promotionPerformanceHandler,
   campaignPerformanceHandler,

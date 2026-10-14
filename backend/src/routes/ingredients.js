@@ -5,7 +5,8 @@ const {
   getIngredientByIdHandler,
   updateIngredientHandler,
   deleteIngredientHandler,
-  getLowStockIngredientsHandler
+  getLowStockIngredientsHandler,
+  getIngredientRemindersHandler
 } = require('../controllers/ingredientController');
 const { validate } = require('../middlewares/validation');
 const {
@@ -21,9 +22,9 @@ router.use(authenticate, requireAdmin);
 
 router.post('/', validate(createIngredientSchema), createIngredientHandler);
 router.get('/', getAllIngredientsHandler);
-// Low stock endpoint should be defined before the generic :id route to avoid route shadowing
+// Reminder / filter endpoints should be defined before the generic :id route to avoid route shadowing
 router.get('/low-stock', getLowStockIngredientsHandler);
-// New endpoint: fetch a single ingredient by ID (admin only)
+router.get('/reminders', getIngredientRemindersHandler);
 router.get('/:id', getIngredientByIdHandler);
 router.patch('/:id', validate(updateIngredientSchema), updateIngredientHandler);
 router.delete('/:id', deleteIngredientHandler);

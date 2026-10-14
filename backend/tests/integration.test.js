@@ -128,6 +128,51 @@ describe('Nasi Goreng Polonia API', () => {
     expect(list.body.data.length).toBeGreaterThan(0);
   });
 
+  test('ingredients support inspection scheduling and reminder check', async () => {
+    const create = await request(app)
+      .post('/api/ingredients')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'Cabai Rawit',
+        unit: 'gram',
+        currentStock: 400,
+        minimumStock: 100,
+        checkFrequency: 'daily',
+        nextCheckAt: new Date(Date.now() - 60000).toISOString()
+      })
+      .expect(201);
+
+    expect(create.body.data.checkFrequency).toBe('daily');
+    expect(create.body.data.nextCheckAt).toBeTruthy();
+    expect(create.body.data.stock).toBe(400);
+    expect(create.body.data.minStock).toBe(100);
+
+    const reminders = await request(app)
+      .get('/api/ingredients/reminders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(Array.isArray(reminders.body.data)).toBe(true);
+    expect(reminders.body.data.some((item) => item._id === create.body.data._id)).toBe(true);
+  });
+
+  test('staff PIC role is supported and audit-safe', async () => {
+    const res = await request(app)
+      .post('/api/staff')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        email: 'pic@example.com',
+        password: 'PicPass123!',
+        name: 'PIC Shift',
+        role: 'pic',
+        phone: '081234567890'
+      })
+      .expect(201);
+
+    expect(res.body.data.role).toBe('pic');
+    expect(res.body.data.name).toBe('PIC Shift');
+  });
+
   test('menus: admin create + public list', async () => {
     const createMenu = await request(app)
       .post('/api/menus')
@@ -141,6 +186,28 @@ describe('Nasi Goreng Polonia API', () => {
       .expect(201);
     expect(createMenu.body.data.name).toBe('Nasi Goreng Spesial');
     menuId = createMenu.body.data._id;
+
+    const recipeMenu = await request(app)
+      .post('/api/menus')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'Nasi Goreng Diet',
+        description: 'Versi porsi yang distandarisasi',
+        price: 22000,
+        ingredients: [{ ingredient: ingredientId, quantity: 50 }],
+        recipe: {
+          version: 'v2',
+          notes: 'Standar porsi normal dan double',
+          portionSizes: [
+            { label: 'normal', multiplier: 1, ingredients: [{ ingredient: ingredientId, quantity: 50 }] },
+            { label: 'double', multiplier: 2, ingredients: [{ ingredient: ingredientId, quantity: 100 }] }
+          ]
+        }
+      })
+      .expect(201);
+
+    expect(recipeMenu.body.data.recipe.version).toBe('v2');
+    expect(recipeMenu.body.data.recipe.portionSizes).toHaveLength(2);
 
     const listPublic = await request(app)
       .get('/api/menus')
@@ -176,6 +243,30 @@ describe('Nasi Goreng Polonia API', () => {
     orderId = res.body.data._id;
   });
 
+  test('walk-in order needs a name but no phone and can complete without a CRM profile', async () => {
+    const created = await request(app).post('/api/orders').send({
+      channel: 'dine_in',
+      fulfillmentType: 'takeaway',
+      customerName: 'Walk-in Guest',
+      items: [{ menuId, quantity: 1 }]
+    }).expect(201);
+    expect(created.body.data.customerPhone).toBe('');
+    expect(created.body.data.customerId).toBeUndefined();
+
+    const id = created.body.data._id;
+    await request(app).patch(`/api/orders/${id}/confirm`)
+      .set('Authorization', `Bearer ${adminToken}`).expect(200);
+    await request(app).patch(`/api/orders/${id}/kitchen`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ kitchenStatus: 'preparing' }).expect(200);
+    await request(app).patch(`/api/orders/${id}/kitchen`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ kitchenStatus: 'ready' }).expect(200);
+    const completed = await request(app).patch(`/api/orders/${id}/complete`)
+      .set('Authorization', `Bearer ${adminToken}`).expect(200);
+    expect(completed.body.data.status).toBe('completed');
+  });
+
   test('orders: create online with contact', async () => {
     const res = await request(app)
       .post('/api/orders')
@@ -187,6 +278,52 @@ describe('Nasi Goreng Polonia API', () => {
       })
       .expect(201);
     expect(res.body.data.customerName).toBe('Ageng');
+  });
+
+  test('orders: edit is allowed before preparation and rejected once preparing', async () => {
+    const created = await request(app)
+      .post('/api/orders')
+      .send({
+        channel: 'online',
+        items: [{ menuId, quantity: 1 }],
+        customerName: 'Edit Test',
+        customerPhone: '081234567890'
+      })
+      .expect(201);
+    const id = created.body.data._id;
+
+    const pendingEdit = await request(app)
+      .patch(`/api/orders/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ items: [{ menuId, quantity: 2 }], notes: 'Less spicy' })
+      .expect(200);
+    expect(pendingEdit.body.data.totalAmount).toBe(50000);
+    expect(pendingEdit.body.data.notes).toBe('Less spicy');
+
+    const confirmed = await request(app)
+      .patch(`/api/orders/${id}/confirm`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const etaBeforeEdit = new Date(confirmed.body.data.estimatedReadyAt).getTime();
+    const queuedEdit = await request(app)
+      .patch(`/api/orders/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ items: [{ menuId, quantity: 3 }] })
+      .expect(200);
+    expect(queuedEdit.body.data.totalAmount).toBe(75000);
+    expect(new Date(queuedEdit.body.data.estimatedReadyAt).getTime()).toBeGreaterThan(etaBeforeEdit);
+
+    await request(app)
+      .patch(`/api/orders/${id}/kitchen`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ kitchenStatus: 'preparing' })
+      .expect(200);
+    const lockedEdit = await request(app)
+      .patch(`/api/orders/${id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ notes: 'Too late' })
+      .expect(400);
+    expect(lockedEdit.body.errorCode).toBe('ORDER_NOT_EDITABLE');
   });
 
   test('orders: public track by orderCode', async () => {
@@ -231,6 +368,24 @@ describe('Nasi Goreng Polonia API', () => {
     expect(res.body.data.estimatedReadyAt).toBeTruthy();
   });
 
+  test('orders: concurrent confirmations allocate distinct queue numbers', async () => {
+    const createOrder = async (phone) => {
+      const response = await request(app).post('/api/orders').send({
+        channel: 'dine_in', customerName: 'Queue Test', customerPhone: phone,
+        items: [{ menuId, quantity: 1 }]
+      }).expect(201);
+      return response.body.data._id;
+    };
+    const [firstId, secondId] = await Promise.all([
+      createOrder('081200000101'), createOrder('081200000102')
+    ]);
+    const confirm = (id) => request(app).patch(`/api/orders/${id}/confirm`)
+      .set('Authorization', `Bearer ${adminToken}`).expect(200);
+    const [first, second] = await Promise.all([confirm(firstId), confirm(secondId)]);
+    expect(first.body.data.queueDate).toBe(second.body.data.queueDate);
+    expect(first.body.data.queueNumber).not.toBe(second.body.data.queueNumber);
+  });
+
   test('orders: kitchen queue list', async () => {
     const res = await request(app)
       .get('/api/orders/queue')
@@ -240,6 +395,19 @@ describe('Nasi Goreng Polonia API', () => {
   });
 
   test('orders: kitchen status + payment + complete uses transaction', async () => {
+    const skippedKitchenStatus = await request(app)
+      .patch(`/api/orders/${orderId}/kitchen`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ kitchenStatus: 'ready' })
+      .expect(400);
+    expect(skippedKitchenStatus.body.errorCode).toBe('INVALID_KITCHEN_TRANSITION');
+
+    await request(app)
+      .patch(`/api/orders/${orderId}/kitchen`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ kitchenStatus: 'preparing' })
+      .expect(200);
+
     const updateKitchen = await request(app)
       .patch(`/api/orders/${orderId}/kitchen`)
       .set('Authorization', `Bearer ${adminToken}`)
@@ -259,6 +427,28 @@ describe('Nasi Goreng Polonia API', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     expect(complete.body.data.status).toBe('completed');
+  });
+
+  test('orders: cannot complete before kitchen status is ready', async () => {
+    const created = await request(app)
+      .post('/api/orders')
+      .send({
+        channel: 'online',
+        items: [{ menuId, quantity: 1 }],
+        customerName: 'Not Ready Test',
+        customerPhone: '081234567890'
+      })
+      .expect(201);
+
+    await request(app)
+      .patch(`/api/orders/${created.body.data._id}/confirm`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const response = await request(app)
+      .patch(`/api/orders/${created.body.data._id}/complete`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(400);
+    expect(response.body.errorCode).toBe('ORDER_NOT_READY');
   });
 
   test('orders: REQUIRE_PAID_BEFORE_COMPLETE blocks until paid', async () => {
@@ -281,6 +471,12 @@ describe('Nasi Goreng Polonia API', () => {
     await request(app)
       .patch(`/api/orders/${testOrderId}/confirm`)
       .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    await request(app)
+      .patch(`/api/orders/${testOrderId}/kitchen`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ kitchenStatus: 'preparing' })
       .expect(200);
 
     await request(app)
@@ -340,10 +536,14 @@ describe('Nasi Goreng Polonia API', () => {
   });
 
   test('orders: cancel flow for pending order', async () => {
+    const Table = require('../src/models/Table');
+    const table = await Table.create({ number: 'CANCEL-1', capacity: 2 });
     const createRes = await request(app)
       .post('/api/orders')
       .send({
         channel: 'dine_in',
+        fulfillmentType: 'dine_in',
+        tableId: String(table._id),
         customerName: 'Test Customer',
         customerPhone: '081234567890',
         items: [{ menuId, quantity: 1 }]
@@ -356,5 +556,8 @@ describe('Nasi Goreng Polonia API', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
     expect(cancelRes.body.data.status).toBe('cancelled');
+    const refreshedTable = await Table.findById(table._id).lean();
+    expect(refreshedTable.status).toBe('cleaning');
+    expect(refreshedTable.activeOrderId).toBeUndefined();
   });
 });

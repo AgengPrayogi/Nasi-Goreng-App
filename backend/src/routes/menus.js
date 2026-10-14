@@ -3,7 +3,9 @@ const {
   createMenuHandler,
   getAllMenusHandler,
   updateMenuHandler,
-  deleteMenuHandler
+  deleteMenuHandler,
+  createMenuReviewHandler,
+  getMenuReviewsHandler
 } = require('../controllers/menuController');
 const { validate } = require('../middlewares/validation');
 const {
@@ -15,6 +17,8 @@ const router = express.Router();
 
 // Public endpoint for frontend: get available menus
 router.get('/', getAllMenusHandler);
+router.get('/:id/reviews', getMenuReviewsHandler);
+router.post('/:id/reviews', createMenuReviewHandler);
 // Public endpoint used by tests: /public returns same data
 router.get('/public', getAllMenusHandler);
 

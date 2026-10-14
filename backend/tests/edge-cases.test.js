@@ -53,6 +53,8 @@ async function createDineInOrder(menuIdent, qty = 1) {
     .post('/api/orders')
     .send({
       channel: 'dine_in',
+      customerName: 'Edge Case Customer',
+      customerPhone: '081234567890',
       items: [{ menuId: menuIdent, quantity: qty }]
     });
 }
@@ -64,11 +66,17 @@ function confirmOrder(id) {
     .set('Authorization', `Bearer ${adminToken}`);
 }
 
-function kitchenReady(id) {
+async function kitchenReady(id) {
+  await request(app)
+    .patch(`/api/orders/${id}/kitchen`)
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({ kitchenStatus: 'preparing' })
+    .expect(200);
   return request(app)
     .patch(`/api/orders/${id}/kitchen`)
     .set('Authorization', `Bearer ${adminToken}`)
-    .send({ kitchenStatus: 'ready' });
+    .send({ kitchenStatus: 'ready' })
+    .expect(200);
 }
 
 function markPaid(id) {
@@ -176,6 +184,8 @@ describe('Order Edge Cases', () => {
       .post('/api/orders')
       .send({
         channel: 'dine_in',
+        customerName: 'Edge Case Customer',
+        customerPhone: '081234567890',
         items: [{ menuId: fakeId, quantity: 1 }]
       })
       .expect(404);
@@ -197,6 +207,8 @@ describe('Order Edge Cases', () => {
       .post('/api/orders')
       .send({
         channel: 'dine_in',
+        customerName: 'Edge Case Customer',
+        customerPhone: '081234567890',
         items: [{ menuId: inactiveMenu._id.toString(), quantity: 1 }]
       })
       .expect(400);
@@ -221,6 +233,8 @@ describe('Order Edge Cases', () => {
       .post('/api/orders')
       .send({
         channel: 'dine_in',
+        customerName: 'Edge Case Customer',
+        customerPhone: '081234567890',
         items: [{ menuId: tempMenu._id.toString(), quantity: 1 }]
       })
       .expect(404);
@@ -257,7 +271,7 @@ describe('Order Edge Cases', () => {
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
-    await kitchenReady(oid).expect(200);
+    await kitchenReady(oid);
     await markPaid(oid).expect(200);
 
     // First complete → success
@@ -267,12 +281,12 @@ describe('Order Edge Cases', () => {
       .expect(200);
     expect(firstComplete.body.data.status).toBe('completed');
 
-    // Second complete → fails
+    // Repeating completion is idempotent.
     const secondComplete = await request(app)
       .patch(`/api/orders/${oid}/complete`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .expect(400);
-    expect(secondComplete.body.errorCode).toBe('INVALID_ORDER_STATUS');
+      .expect(200);
+    expect(secondComplete.body.data.status).toBe('completed');
   });
 
   // ---- cancel order yang sudah completed ----
@@ -281,7 +295,7 @@ describe('Order Edge Cases', () => {
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
-    await kitchenReady(oid).expect(200);
+    await kitchenReady(oid);
     await markPaid(oid).expect(200);
     await request(app)
       .patch(`/api/orders/${oid}/complete`)
@@ -319,7 +333,7 @@ describe('Order Edge Cases', () => {
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
-    await kitchenReady(oid).expect(200);
+    await kitchenReady(oid);
     await markPaid(oid).expect(200);
     await request(app)
       .patch(`/api/orders/${oid}/complete`)
@@ -341,6 +355,42 @@ describe('Order Edge Cases', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(400);
     expect(completeRes.body.errorCode).toBe('INVALID_ORDER_STATUS');
+  });
+
+  test('cannot complete a confirmed order before kitchen marks it ready', async () => {
+    const createRes = await createDineInOrder(menuId);
+    const oid = createRes.body.data._id;
+    await confirmOrder(oid).expect(200);
+
+    const completeRes = await request(app)
+      .patch(`/api/orders/${oid}/complete`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(400);
+    expect(completeRes.body.errorCode).toBe('ORDER_NOT_READY');
+  });
+
+  test('kitchen status can only move queued to preparing to ready', async () => {
+    const createRes = await createDineInOrder(menuId);
+    const oid = createRes.body.data._id;
+    await confirmOrder(oid).expect(200);
+
+    const skipped = await request(app)
+      .patch(`/api/orders/${oid}/kitchen`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ kitchenStatus: 'ready' })
+      .expect(400);
+    expect(skipped.body.errorCode).toBe('INVALID_KITCHEN_TRANSITION');
+
+    await request(app)
+      .patch(`/api/orders/${oid}/kitchen`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ kitchenStatus: 'preparing' })
+      .expect(200);
+    await request(app)
+      .patch(`/api/orders/${oid}/kitchen`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ kitchenStatus: 'ready' })
+      .expect(200);
   });
 
   // ---- cancel an already cancelled order ----
@@ -399,7 +449,7 @@ describe('Order Edge Cases', () => {
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
-    await kitchenReady(oid).expect(200);
+    await kitchenReady(oid);
     await markPaid(oid).expect(200);
     await request(app)
       .patch(`/api/orders/${oid}/complete`)
@@ -459,6 +509,7 @@ describe('Order Edge Cases', () => {
     const oid = createRes.body.data._id;
 
     await confirmOrder(oid).expect(200);
+    await kitchenReady(oid);
 
     const completeRes = await request(app)
       .patch(`/api/orders/${oid}/complete`)

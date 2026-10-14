@@ -14,6 +14,7 @@ export default function AdminLogin() {
       const token = res.data?.data?.token
       if (token) {
         localStorage.setItem('jwt', token)
+        localStorage.setItem('adminToken', token)
         navigate('/admin/dashboard', { replace: true })
       }
     },

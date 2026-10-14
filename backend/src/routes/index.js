@@ -19,6 +19,12 @@ const analyticsRoutes = require('./analytics');
 const alertRoutes = require('./alerts');
 const campaignRoutes = require('./campaigns');
 const budgetRoutes = require('./budget');
+const tableRoutes = require('./tables');
+const promotionRoutes = require('./promotions');
+const marketplaceRoutes = require('./marketplace');
+const reservationRoutes = require('./reservations');
+const whatsappRoutes = require('./whatsapp');
+const feedbackRoutes = require('./feedback');
 
 const router = express.Router();
 
@@ -42,6 +48,12 @@ router.use('/analytics', analyticsRoutes);
 router.use('/alerts', alertRoutes);
 router.use('/campaigns', campaignRoutes);
 router.use('/budget', budgetRoutes);
+router.use('/tables', tableRoutes);
+router.use('/promotions', promotionRoutes);
+router.use('/marketplace', marketplaceRoutes);
+router.use('/reservations', reservationRoutes);
+router.use('/whatsapp', whatsappRoutes);
+router.use('/feedback', feedbackRoutes);
 
 module.exports = router;
 

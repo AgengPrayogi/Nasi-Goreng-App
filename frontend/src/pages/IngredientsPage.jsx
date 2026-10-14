@@ -6,7 +6,7 @@ export default function IngredientsPage() {
   const queryClient = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState(null)
-  const [form, setForm] = useState({ name: '', unit: '', stock: 0, minStock: 0 })
+  const [form, setForm] = useState({ name: '', unit: '', currentStock: 0, minimumStock: 0 })
   const [error, setError] = useState('')
 
   const { data, isLoading, refetch } = useQuery({
@@ -37,19 +37,27 @@ export default function IngredientsPage() {
 
   const resetForm = () => {
     setShowForm(false); setEditItem(null); setError('')
-    setForm({ name: '', unit: '', stock: 0, minStock: 0 })
+    setForm({ name: '', unit: '', currentStock: 0, minimumStock: 0 })
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    const body = { ...form, stock: Number(form.stock), minStock: Number(form.minStock) }
+    const body = {
+      ...form,
+      currentStock: Number(form.currentStock),
+      minimumStock: Number(form.minimumStock),
+      stock: Number(form.currentStock),
+      minStock: Number(form.minimumStock)
+    }
     if (editItem) updateMutation.mutate({ id: editItem._id, body })
     else createMutation.mutate(body)
   }
 
   const handleEdit = (item) => {
+    const currentStock = item.currentStock ?? item.stock ?? 0
+    const minimumStock = item.minimumStock ?? item.minStock ?? 0
     setEditItem(item)
-    setForm({ name: item.name, unit: item.unit, stock: item.stock, minStock: item.minStock })
+    setForm({ name: item.name, unit: item.unit, currentStock, minimumStock })
     setShowForm(true); setError('')
   }
 
@@ -116,11 +124,11 @@ export default function IngredientsPage() {
               </div>
               <div className="form-group">
                 <label>Stock</label>
-                <input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} required min="0" />
+                <input type="number" value={form.currentStock} onChange={(e) => setForm({ ...form, currentStock: e.target.value })} required min="0" />
               </div>
               <div className="form-group">
                 <label>Min Stock</label>
-                <input type="number" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} required min="0" />
+                <input type="number" value={form.minimumStock} onChange={(e) => setForm({ ...form, minimumStock: e.target.value })} required min="0" />
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -173,8 +181,8 @@ export default function IngredientsPage() {
                         </div>
                       </td>
                       <td>{item.unit}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 'bold', color: isLow ? 'var(--red)' : 'inherit' }}>{item.stock}</td>
-                      <td style={{ textAlign: 'right' }}>{item.minStock}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 'bold', color: isLow ? 'var(--red)' : 'inherit' }}>{item.currentStock ?? item.stock ?? 0}</td>
+                      <td style={{ textAlign: 'right' }}>{item.minimumStock ?? item.minStock ?? 0}</td>
                       <td style={{ textAlign: 'center' }}>
                         {isLow
                           ? <span className="badge badge-red">Low Stock</span>

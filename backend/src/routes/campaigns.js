@@ -10,5 +10,6 @@ router.get('/', campaignController.listCampaignsHandler);
 router.post('/', campaignController.createCampaignHandler);
 router.get('/:id', campaignController.getCampaignHandler);
 router.patch('/:id', campaignController.updateCampaignHandler);
+router.post('/:id/evaluate', campaignController.evaluateCampaignHandler);
 
 module.exports = router;

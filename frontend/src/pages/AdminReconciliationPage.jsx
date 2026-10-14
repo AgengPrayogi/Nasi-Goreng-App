@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import './AdminReconciliationPage.css';
 
 const AdminReconciliationPage = () => {
@@ -16,6 +16,9 @@ const AdminReconciliationPage = () => {
 
   const [closeFormData, setCloseFormData] = useState({
     actualTotal: '',
+    actualCash: '',
+    actualTransfer: '',
+    actualQris: '',
     notes: ''
   });
 
@@ -24,7 +27,7 @@ const AdminReconciliationPage = () => {
     to: new Date().toISOString().split('T')[0]
   });
 
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem('jwt') || localStorage.getItem('adminToken');
 
   // Auto-fetch when view changes
   useEffect(() => {
@@ -44,8 +47,8 @@ const AdminReconciliationPage = () => {
   const fetchTodayReconciliation = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `http://localhost:5000/api/reconciliation/${selectedDate}`,
+      const response = await api.get(
+        `/reconciliation/${selectedDate}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setReconciliationData(response.data.data);
@@ -64,8 +67,8 @@ const AdminReconciliationPage = () => {
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `http://localhost:5000/api/reconciliation/range/period?from=${dateRange.from}&to=${dateRange.to}`,
+      const response = await api.get(
+        `/reconciliation/range/period?from=${dateRange.from}&to=${dateRange.to}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setHistoryData(response.data.data);
@@ -80,8 +83,8 @@ const AdminReconciliationPage = () => {
   const fetchTrend = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `http://localhost:5000/api/reconciliation/trend/data?from=${dateRange.from}&to=${dateRange.to}&granularity=daily`,
+      const response = await api.get(
+        `/reconciliation/trend/data?from=${dateRange.from}&to=${dateRange.to}&granularity=daily`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setTrendData(response.data.data);
@@ -96,8 +99,8 @@ const AdminReconciliationPage = () => {
   const fetchHealthMetrics = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `http://localhost:5000/api/reconciliation/health/metrics?from=${dateRange.from}&to=${dateRange.to}`,
+      const response = await api.get(
+        `/reconciliation/health/metrics?from=${dateRange.from}&to=${dateRange.to}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setHealthMetrics(response.data.data);
@@ -113,8 +116,8 @@ const AdminReconciliationPage = () => {
     try {
       setLoading(true);
       const [year, month] = monthYear.split('-');
-      const response = await axios.get(
-        `http://localhost:5000/api/reconciliation/monthly/${year}/${month}`,
+      const response = await api.get(
+        `/reconciliation/monthly/${year}/${month}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setMonthlyData(response.data.data);
@@ -130,20 +133,42 @@ const AdminReconciliationPage = () => {
     e.preventDefault();
     try {
       setLoading(true);
-      const response = await axios.post(
-        'http://localhost:5000/api/reconciliation/close',
+      const response = await api.post(
+        '/reconciliation/close',
         {
           date: selectedDate,
           actualTotal: closeFormData.actualTotal ? parseInt(closeFormData.actualTotal) : undefined,
+          actualPaymentBreakdown: {
+            cash: closeFormData.actualCash ? parseInt(closeFormData.actualCash) : undefined,
+            transfer: closeFormData.actualTransfer ? parseInt(closeFormData.actualTransfer) : undefined,
+            qris: closeFormData.actualQris ? parseInt(closeFormData.actualQris) : undefined
+          },
           notes: closeFormData.notes
         },
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setReconciliationData(response.data.data);
-      setCloseFormData({ actualTotal: '', notes: '' });
+      setCloseFormData({ actualTotal: '', actualCash: '', actualTransfer: '', actualQris: '', notes: '' });
       setError(null);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal menutup penjualan');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinalizeDay = async () => {
+    try {
+      setLoading(true);
+      const response = await api.post(
+        `/reconciliation/${selectedDate}/finalize`,
+        {},
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      setReconciliationData(response.data.data);
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal memfinalisasi penjualan');
     } finally {
       setLoading(false);
     }
@@ -238,6 +263,18 @@ const AdminReconciliationPage = () => {
                     <span className="label">QRIS:</span>
                     <span className="value">Rp {reconciliationData.paymentBreakdown?.qris?.toLocaleString('id-ID')}</span>
                   </div>
+                  <div className="result-item">
+                    <span className="label">Selisih Cash:</span>
+                    <span className="value">Rp {reconciliationData.paymentDiscrepancy?.cash?.toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="result-item">
+                    <span className="label">Selisih Transfer:</span>
+                    <span className="value">Rp {reconciliationData.paymentDiscrepancy?.transfer?.toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="result-item">
+                    <span className="label">Selisih QRIS:</span>
+                    <span className="value">Rp {reconciliationData.paymentDiscrepancy?.qris?.toLocaleString('id-ID')}</span>
+                  </div>
                 </div>
 
                 {reconciliationData.status === 'open' && (
@@ -250,6 +287,18 @@ const AdminReconciliationPage = () => {
                         onChange={(e) => setCloseFormData({...closeFormData, actualTotal: e.target.value})}
                         placeholder="Jika ada perbedaan"
                       />
+                    </div>
+                    <div className="form-group">
+                      <label>Actual Cash</label>
+                      <input type="number" value={closeFormData.actualCash} onChange={(e) => setCloseFormData({...closeFormData, actualCash: e.target.value})} placeholder="Kas aktual" />
+                    </div>
+                    <div className="form-group">
+                      <label>Actual Transfer</label>
+                      <input type="number" value={closeFormData.actualTransfer} onChange={(e) => setCloseFormData({...closeFormData, actualTransfer: e.target.value})} placeholder="Transfer aktual" />
+                    </div>
+                    <div className="form-group">
+                      <label>Actual QRIS</label>
+                      <input type="number" value={closeFormData.actualQris} onChange={(e) => setCloseFormData({...closeFormData, actualQris: e.target.value})} placeholder="QRIS aktual" />
                     </div>
 
                     <div className="form-group">
@@ -273,7 +322,14 @@ const AdminReconciliationPage = () => {
                     <p>✓ Penjualan sudah ditutup</p>
                     <p>Ditutup oleh: {reconciliationData.closedBy?.name}</p>
                     <p>Waktu: {new Date(reconciliationData.closedAt).toLocaleString('id-ID')}</p>
+                    <button type="button" className="btn btn-primary" onClick={handleFinalizeDay} disabled={loading}>
+                      {loading ? 'Memfinalisasi...' : 'Finalisasi Laporan'}
+                    </button>
                   </div>
+                )}
+
+                {reconciliationData.status === 'finalized' && (
+                  <div className="closed-status"><p>✓ Laporan sudah difinalisasi dan dikunci.</p></div>
                 )}
               </div>
             ) : (

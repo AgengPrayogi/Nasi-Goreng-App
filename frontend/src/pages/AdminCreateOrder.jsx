@@ -10,6 +10,9 @@ export default function AdminCreateOrder() {
   const [orderItems, setOrderItems] = useState([])
   const [notes, setNotes] = useState('')
   const [channel, setChannel] = useState('walk_in')
+  const [fulfillmentType, setFulfillmentType] = useState('takeaway')
+  const [tableId, setTableId] = useState('')
+  const [validationError, setValidationError] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-menus-order'],
@@ -17,6 +20,11 @@ export default function AdminCreateOrder() {
       const res = await api.get('/menus')
       return res.data
     },
+  })
+  const { data: tableData } = useQuery({
+    queryKey: ['admin-available-tables'],
+    queryFn: async () => (await api.get('/tables/available')).data,
+    enabled: fulfillmentType === 'dine_in',
   })
 
   const createOrder = useMutation({
@@ -63,10 +71,21 @@ export default function AdminCreateOrder() {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (orderItems.length === 0) return
+    if (!customerName.trim()) {
+      setValidationError('Customer name is required.')
+      return
+    }
+    if (fulfillmentType === 'dine_in' && !tableId) {
+      setValidationError('Select an available table for dine-in.')
+      return
+    }
+    setValidationError('')
     const payload = {
       items: orderItems.map((i) => ({ menuId: i.menuId, name: i.name, price: i.price, quantity: i.quantity })),
       notes: notes || undefined,
-      channel,
+      channel: channel === 'walk_in' ? 'dine_in' : channel,
+      fulfillmentType,
+      tableId: tableId || undefined,
       customerName: customerName || undefined,
       customerPhone: customerPhone || undefined,
     }
@@ -86,6 +105,14 @@ export default function AdminCreateOrder() {
             <option value="walk_in">Walk In</option>
             <option value="online">Online</option>
           </select>
+          <select value={fulfillmentType} onChange={(e) => { setFulfillmentType(e.target.value); setTableId('') }} style={{ padding: '0.4rem' }}>
+            <option value="takeaway">Takeaway</option>
+            <option value="dine_in">Dine-in</option>
+          </select>
+          {fulfillmentType === 'dine_in' && <select required value={tableId} onChange={(e) => setTableId(e.target.value)} style={{ padding: '0.4rem' }}>
+            <option value="">Table</option>
+            {(tableData?.data || []).map((table) => <option key={table._id} value={table._id}>Meja {table.number}</option>)}
+          </select>}
         </div>
       </div>
 
@@ -152,12 +179,12 @@ export default function AdminCreateOrder() {
             )}
 
             <div className="form-group">
-              <label>Customer Name</label>
-              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="(optional)" />
+              <label>Customer Name *</label>
+              <input type="text" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Phone</label>
-              <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="(optional)" />
+              <label>Phone (optional, for customer history / reorder)</label>
+              <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="08xxxxxxxxxx" />
             </div>
             <div className="form-group">
               <label>Notes</label>
@@ -178,6 +205,7 @@ export default function AdminCreateOrder() {
                 Failed to create order. Please try again.
               </p>
             )}
+            {validationError && <p role="alert" style={{ color: 'var(--red)', marginTop: '0.5rem', fontSize: '0.85rem' }}>{validationError}</p>}
           </form>
         </div>
       </div>

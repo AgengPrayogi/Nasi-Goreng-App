@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../api.js'
@@ -9,6 +10,9 @@ export default function OrderDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [isEditing, setIsEditing] = useState(false)
+  const [editItems, setEditItems] = useState([])
+  const [editNotes, setEditNotes] = useState('')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['order', id],
@@ -17,6 +21,13 @@ export default function OrderDetailPage() {
       return res.data
     },
   })
+  const order = data?.data
+  const { data: menuData, isLoading: menusLoading } = useQuery({
+    queryKey: ['order-edit-menus'],
+    queryFn: async () => (await api.get('/menus')).data,
+    enabled: !!order && (order.status === 'pending' || (order.status === 'confirmed' && order.kitchenStatus === 'queued')),
+  })
+  const menus = menuData?.data || []
 
   const confirmMutation = useMutation({
     mutationFn: () => api.patch(`/orders/${id}/confirm`),
@@ -35,7 +46,11 @@ export default function OrderDetailPage() {
 
   const kitchenMutation = useMutation({
     mutationFn: (kitchenStatus) => api.patch(`/orders/${id}/kitchen`, { kitchenStatus }),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['order', id] }) },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['order', id] })
+      queryClient.invalidateQueries({ queryKey: ['kitchen-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+    },
   })
 
   const completeMutation = useMutation({
@@ -43,7 +58,16 @@ export default function OrderDetailPage() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['order', id] }) },
   })
 
-  const order = data?.data
+  const editMutation = useMutation({
+    mutationFn: (body) => api.patch(`/orders/${id}`, body),
+    onSuccess: () => {
+      setIsEditing(false)
+      queryClient.invalidateQueries({ queryKey: ['order', id] })
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+      queryClient.invalidateQueries({ queryKey: ['kitchen-queue'] })
+    },
+  })
+
   const formatPrice = (price) => price != null ? `Rp ${Number(price).toLocaleString('id-ID')}` : '-'
   const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('id-ID') : '-'
   const formatETA = (dateStr) => dateStr ? new Date(dateStr).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'
@@ -61,6 +85,45 @@ export default function OrderDetailPage() {
     } else if (next) {
       kitchenMutation.mutate(next)
     }
+  }
+
+  const startEditing = () => {
+    setEditItems((order.items || []).map((item) => {
+      const menuId = item.menu?._id || item.menu
+      const menu = menus.find((entry) => entry._id === menuId)
+      return {
+        menuId,
+        name: item.menu?.name || menu?.name || 'Menu',
+        quantity: item.quantity,
+      }
+    }))
+    setEditNotes(order.notes || '')
+    setIsEditing(true)
+  }
+
+  const updateEditItem = (index, changes) => {
+    setEditItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...changes } : item))
+  }
+
+  const addEditItem = (menuId) => {
+    const menu = menus.find((entry) => entry._id === menuId)
+    if (!menu) return
+    setEditItems((current) => {
+      const existing = current.find((item) => item.menuId === menuId)
+      if (existing) {
+        return current.map((item) => item.menuId === menuId ? { ...item, quantity: item.quantity + 1 } : item)
+      }
+      return [...current, { menuId, name: menu.name, quantity: 1 }]
+    })
+  }
+
+  const saveOrderEdit = (event) => {
+    event.preventDefault()
+    const body = { notes: editNotes }
+    if (order.paymentStatus !== 'paid') {
+      body.items = editItems.map(({ menuId, quantity }) => ({ menuId, quantity: Number(quantity) }))
+    }
+    editMutation.mutate(body)
   }
 
   if (isLoading) return <div style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" /></div>
@@ -128,6 +191,9 @@ export default function OrderDetailPage() {
               </button>
             </div>
           )}
+          {kitchenMutation.isError && (
+            <p role="alert" style={{ color: 'var(--red)' }}>Status dapur tidak berubah. Muat ulang order untuk melihat status terbaru.</p>
+          )}
 
           {order.estimatedReadyAt && (
             <div className="card" style={{ marginBottom: '1rem', textAlign: 'center', background: '#fff8e1' }}>
@@ -137,17 +203,71 @@ export default function OrderDetailPage() {
 
           {/* Items */}
           <div className="card">
-            <h4 style={{ margin: '0 0 0.75rem', color: 'var(--black)' }}>Order Items</h4>
-            {order.items?.map((item, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: i < order.items.length - 1 ? '1px solid var(--gray-200)' : 'none' }}>
-                <span>{item.name} <strong>x{item.quantity}</strong></span>
-                <span style={{ fontWeight: 'bold' }}>{formatPrice(item.price * item.quantity)}</span>
-              </div>
-            ))}
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', fontSize: '1.2rem', fontWeight: 'bold', borderTop: '2px solid var(--gray-300)' }}>
-              <span>Total</span>
-              <span style={{ color: 'var(--red)' }}>{formatPrice(order.totalAmount)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h4 style={{ margin: 0, color: 'var(--black)' }}>Order Items</h4>
+              {(order.status === 'pending' || (order.status === 'confirmed' && order.kitchenStatus === 'queued')) && !isEditing && (
+                <button className="btn btn-gray btn-sm" onClick={startEditing} disabled={menusLoading}>Edit Order</button>
+              )}
             </div>
+            {isEditing ? (
+              <form onSubmit={saveOrderEdit}>
+                {order.paymentStatus === 'paid' && <p style={{ color: 'var(--gray-500)', fontSize: '0.85rem' }}>Items are locked after payment is recorded; notes can still be updated.</p>}
+                {editItems.map((item, index) => {
+                  const menuId = String(item.menuId)
+                  const itemMenu = menus.find((menu) => menu._id === menuId)
+                  const price = itemMenu?.price ?? order.items.find((orderItem) => String(orderItem.menu?._id || orderItem.menu) === menuId)?.priceAtOrder ?? 0
+                  return (
+                    <div key={`${menuId}-${index}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 90px auto', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <select value={menuId} disabled={order.paymentStatus === 'paid'} onChange={(event) => {
+                        const menu = menus.find((entry) => entry._id === event.target.value)
+                        if (menu) updateEditItem(index, { menuId: menu._id, name: menu.name })
+                      }}>
+                        {menus.filter((menu) => menu.isAvailable !== false && menu.available !== false || menu._id === menuId).map((menu) => <option key={menu._id} value={menu._id}>{menu.name}</option>)}
+                      </select>
+                      <input aria-label={`Quantity for ${item.name}`} type="number" min="1" value={item.quantity} disabled={order.paymentStatus === 'paid'} onChange={(event) => updateEditItem(index, { quantity: event.target.value })} />
+                      <button type="button" className="btn btn-red btn-sm" aria-label={`Remove ${item.name}`} disabled={order.paymentStatus === 'paid'} onClick={() => setEditItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</button>
+                      <span style={{ gridColumn: '1 / -1', color: 'var(--gray-500)', fontSize: '0.8rem' }}>{formatPrice(price)} each</span>
+                    </div>
+                  )
+                })}
+                {order.paymentStatus !== 'paid' && (
+                  <select defaultValue="" aria-label="Add menu item" onChange={(event) => { addEditItem(event.target.value); event.target.value = '' }} style={{ margin: '0.5rem 0 1rem' }}>
+                    <option value="">Add menu item...</option>
+                    {menus.filter((menu) => menu.isAvailable !== false && menu.available !== false).map((menu) => <option key={menu._id} value={menu._id}>{menu.name}</option>)}
+                  </select>
+                )}
+                <div className="form-group">
+                  <label htmlFor="order-edit-notes">Order notes</label>
+                  <textarea id="order-edit-notes" value={editNotes} onChange={(event) => setEditNotes(event.target.value)} rows={2} style={{ width: '100%', resize: 'vertical' }} />
+                </div>
+                {editMutation.isError && <p style={{ color: 'var(--red)' }}>Order could not be updated. It may have entered preparation; reload and check its status.</p>}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                  <button type="button" className="btn btn-gray btn-sm" onClick={() => setIsEditing(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-red btn-sm" disabled={editMutation.isPending || (order.paymentStatus !== 'paid' && editItems.length === 0)}>
+                    {editMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                {order.items?.map((item, i) => {
+                  const menuId = String(item.menu?._id || item.menu)
+                  const menu = menus.find((entry) => entry._id === menuId)
+                  const name = item.menu?.name || menu?.name || item.name || 'Menu'
+                  const price = item.priceAtOrder ?? item.price ?? menu?.price
+                  return (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: i < order.items.length - 1 ? '1px solid var(--gray-200)' : 'none' }}>
+                      <span>{name} <strong>x{item.quantity}</strong></span>
+                      <span style={{ fontWeight: 'bold' }}>{formatPrice(price * item.quantity)}</span>
+                    </div>
+                  )
+                })}
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', fontSize: '1.2rem', fontWeight: 'bold', borderTop: '2px solid var(--gray-300)' }}>
+                  <span>Total</span>
+                  <span style={{ color: 'var(--red)' }}>{formatPrice(order.totalAmount)}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

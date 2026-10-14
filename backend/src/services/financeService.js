@@ -1,10 +1,22 @@
 const Finance = require('../models/Finance');
 const { AppError } = require('../errors/AppError');
 
-/**
- * Create a finance transaction (income or expense).
- */
-async function createTransaction({ type, amount, description, category, reference, date, relatedOrder, createdBy }) {
+async function createTransactionIfMissing({ type, amount, description, category, reference, date, relatedOrder, createdBy }) {
+  if (!reference && !relatedOrder) {
+    return null;
+  }
+
+  const matcher = reference
+    ? { reference }
+    : { relatedOrder, type, category };
+
+  const existing = await Finance.findOne(matcher).lean();
+  if (existing) return existing;
+
+  const safeCreatedBy = createdBy && typeof createdBy === 'string' && createdBy.length === 24
+    ? createdBy
+    : undefined;
+
   const transaction = await Finance.create({
     type,
     amount,
@@ -13,9 +25,25 @@ async function createTransaction({ type, amount, description, category, referenc
     reference,
     date: date || new Date(),
     relatedOrder,
-    createdBy,
+    createdBy: safeCreatedBy,
   });
   return transaction;
+}
+
+/**
+ * Create a finance transaction (income or expense).
+ */
+async function createTransaction({ type, amount, description, category, reference, date, relatedOrder, createdBy }) {
+  return createTransactionIfMissing({
+    type,
+    amount,
+    description,
+    category,
+    reference,
+    date,
+    relatedOrder,
+    createdBy
+  });
 }
 
 /**
@@ -173,6 +201,7 @@ async function getFinanceSummary({ startDate, endDate, period = 'daily' }) {
 }
 
 module.exports = {
+  createTransactionIfMissing,
   createTransaction,
   listTransactions,
   getFinanceSummary,

@@ -54,7 +54,6 @@ const SupplierSchema = new mongoose.Schema(
 );
 
 // Indexes for common queries
-SupplierSchema.index({ name: 1 });
 SupplierSchema.index({ isActive: 1 });
 SupplierSchema.index({ createdAt: -1 });
 

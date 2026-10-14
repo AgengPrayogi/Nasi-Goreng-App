@@ -55,5 +55,6 @@ const FinanceSchema = new mongoose.Schema(
 FinanceSchema.index({ type: 1, date: -1 });
 FinanceSchema.index({ category: 1 });
 FinanceSchema.index({ date: -1 });
+FinanceSchema.index({ reference: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Finance', FinanceSchema);

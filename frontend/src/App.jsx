@@ -31,17 +31,24 @@ import AdminCustomersPage from './pages/AdminCustomersPage.jsx'
 import AdminSuppliersPage from './pages/AdminSuppliersPage.jsx'
 import AdminPurchaseOrdersPage from './pages/AdminPurchaseOrdersPage.jsx'
 import AdminReconciliationPage from './pages/AdminReconciliationPage.jsx'
+import AdminTablesPage from './pages/AdminTablesPage.jsx'
+import AdminMarketplacePage from './pages/AdminMarketplacePage.jsx'
+import ReservationPage from './pages/ReservationPage.jsx'
+import AdminReservationsPage from './pages/AdminReservationsPage.jsx'
+import OrderFeedbackPage from './pages/OrderFeedbackPage.jsx'
 
 function App() {
-  const isAuthenticated = !!localStorage.getItem('jwt')
+  const isAuthenticated = !!(localStorage.getItem('jwt') || localStorage.getItem('adminToken'))
   return (
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<HomePage />} />
       <Route path="/order" element={<PublicOrderPage />} />
+      <Route path="/reserve" element={<ReservationPage />} />
       <Route path="/track" element={<TrackOrderPage />} />
       <Route path="/payment/:orderCode" element={<PaymentPage />} />
       <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+      <Route path="/feedback/:orderCode" element={<OrderFeedbackPage />} />
 
       {/* Admin routes */}
       <Route path="/admin/login" element={<AdminLogin />} />
@@ -70,6 +77,9 @@ function App() {
         <Route path="suppliers" element={<AdminSuppliersPage />} />
         <Route path="purchase-orders" element={<AdminPurchaseOrdersPage />} />
         <Route path="reconciliation" element={<AdminReconciliationPage />} />
+        <Route path="tables" element={<AdminTablesPage />} />
+        <Route path="reservations" element={<AdminReservationsPage />} />
+        <Route path="marketplace" element={<AdminMarketplacePage />} />
 
         {/* Business Intelligence */}
         <Route path="analytics" element={<AnalyticsPage />} />

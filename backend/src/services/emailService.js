@@ -6,6 +6,10 @@ let transporter;
 async function initializeEmailService() {
   if (transporter) return; // Already initialized
 
+  if (process.env.NODE_ENV === 'production' && (process.env.EMAIL_SERVICE === 'mock' || !process.env.SMTP_HOST)) {
+    throw new Error('A real SMTP service must be configured in production');
+  }
+
   // Ethereal email for real SMTP testing
   if (process.env.EMAIL_SERVICE === 'ethereal') {
     try {
@@ -31,13 +35,14 @@ async function initializeEmailService() {
 
   // Mock mode explicitly requested
   if (process.env.EMAIL_SERVICE === 'mock' || !process.env.SMTP_HOST) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Mock email delivery is not allowed in production');
+    }
     // Mock transporter for development/testing
     transporter = {
       sendMail: async (mailOptions) => {
         console.log('📧 Email would be sent (mock mode):', {
-          to: mailOptions.to,
-          subject: mailOptions.subject,
-          link: mailOptions.html?.match(/href="([^"]+)"/)?.[1] || 'N/A'
+          subject: mailOptions.subject
         });
         return { messageId: 'mock-' + Date.now() };
       }
@@ -50,7 +55,6 @@ async function initializeEmailService() {
   console.log('   Host:', process.env.SMTP_HOST);
   console.log('   Port:', process.env.SMTP_PORT || 587);
   console.log('   Secure:', process.env.SMTP_SECURE === 'true');
-  console.log('   User:', process.env.SMTP_USER);
   console.log('   From:', process.env.SMTP_FROM);
 
   transporter = nodemailer.createTransport({
@@ -68,6 +72,10 @@ async function initializeEmailService() {
     await transporter.verify();
     console.log('✅ SMTP Connection Verified - Server is ready to send emails');
   } catch (err) {
+    if (process.env.NODE_ENV === 'production') {
+      transporter = null;
+      throw new Error(`SMTP connection verification failed: ${err.message}`);
+    }
     console.error('❌ SMTP Connection Failed:');
     console.error('   Error:', err.message);
     console.error('   Check SMTP_HOST, SMTP_USER, and SMTP_PASSWORD');
@@ -75,9 +83,7 @@ async function initializeEmailService() {
     transporter = {
       sendMail: async (mailOptions) => {
         console.log('📧 Email would be sent (fallback mock mode):', {
-          to: mailOptions.to,
-          subject: mailOptions.subject,
-          link: mailOptions.html?.match(/href="([^"]+)"/)?.[1] || 'N/A'
+          subject: mailOptions.subject
         });
         return { messageId: 'mock-' + Date.now() };
       }
@@ -257,9 +263,7 @@ async function sendVerificationEmail(email, token) {
   
   try {
     console.log('📬 SENDING VERIFICATION EMAIL:');
-    console.log('   To:', email);
-    console.log('   Token:', token);
-    console.log('   Frontend URL:', frontendUrl);
+    console.log('   Verification email queued for delivery');
     console.log('   Email Service Mode:', process.env.EMAIL_SERVICE || 'mock');
     
     const result = await transporter.sendMail({
@@ -358,10 +362,22 @@ async function sendPasswordChangedEmail(email) {
   }
 }
 
+async function sendReportEmail(recipients, subject, text, attachment) {
+  if (!transporter) await initializeEmailService();
+  return transporter.sendMail({
+    from: process.env.SMTP_FROM || 'noreply@nasiggorengpolonia.id',
+    to: recipients,
+    subject,
+    text,
+    attachments: attachment ? [{ filename: attachment.filename, content: attachment.content }] : []
+  });
+}
+
 module.exports = {
   initializeEmailService,
   sendVerificationEmail,
   sendVerificationSuccessEmail,
   sendPasswordResetEmail,
-  sendPasswordChangedEmail
+  sendPasswordChangedEmail,
+  sendReportEmail
 };

@@ -32,7 +32,14 @@ app.use(
 );
 
 // Core middlewares
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, res, buffer) => {
+    if (req.originalUrl === '/api/whatsapp/webhook') {
+      req.rawBody = Buffer.from(buffer);
+    }
+  }
+}));
 
 // Routes
 app.use('/api', apiRoutes);

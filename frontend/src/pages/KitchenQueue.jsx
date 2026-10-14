@@ -35,6 +35,7 @@ export default function KitchenQueue() {
     mutationFn: ({ id, kitchenStatus }) => api.patch(`/orders/${id}/kitchen`, { kitchenStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-executive'] })
     },
   })
@@ -43,6 +44,7 @@ export default function KitchenQueue() {
     mutationFn: (id) => api.patch(`/orders/${id}/complete`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-executive'] })
     },
   })
@@ -164,6 +166,12 @@ export default function KitchenQueue() {
           <div style={{ fontSize: '0.8rem', color: 'var(--gray-700)' }}>Total Active</div>
         </div>
       </div>
+
+      {(advanceMutation.isError || completeMutation.isError) && (
+        <p role="alert" style={{ color: 'var(--red)', marginBottom: '0.75rem' }}>
+          Status order tidak berubah. Muat ulang antrean dan periksa status terbaru.
+        </p>
+      )}
 
       {orders.length === 0 ? (
         <div className="card" style={{ 

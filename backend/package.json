@@ -10,7 +10,9 @@
     "dev": "node --watch server.js",
     "test": "NODE_ENV=test jest --runInBand --forceExit",
     "migrate:orders-phase1": "node scripts/migrate-orders-phase1.js",
-    "migrate:menu-costs": "node scripts/backfill-menu-costs.js"
+    "migrate:menu-costs": "node scripts/backfill-menu-costs.js",
+    "migrate:customer-tiers-v2": "node scripts/migrate-customer-tiers-v2.js",
+    "migrate:customer-segments": "node scripts/migrate-customer-segments.js"
   },
   "engines": {
     "node": ">=18.0.0"

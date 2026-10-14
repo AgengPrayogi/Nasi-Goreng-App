@@ -8,6 +8,24 @@ const MenuIngredientSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const MenuRecipePortionSchema = new mongoose.Schema(
+  {
+    label: { type: String, required: true, trim: true },
+    multiplier: { type: Number, default: 1, min: 0 },
+    ingredients: { type: [MenuIngredientSchema], default: [] }
+  },
+  { _id: false }
+);
+
+const MenuRecipeSchema = new mongoose.Schema(
+  {
+    version: { type: String, default: 'v1', trim: true },
+    notes: { type: String, default: '', trim: true },
+    portionSizes: { type: [MenuRecipePortionSchema], default: [] }
+  },
+  { _id: false }
+);
+
 const MenuSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -16,6 +34,7 @@ const MenuSchema = new mongoose.Schema(
     imageUrl: { type: String, default: '' },
     isAvailable: { type: Boolean, default: true },
     ingredients: { type: [MenuIngredientSchema], default: [] },
+    recipe: { type: MenuRecipeSchema, default: null },
     costPrice: { type: Number, default: 0, min: 0 },
     overheadAllocation: { type: Number, default: 0, min: 0 },
     profitMargin: { type: Number, default: 0 },

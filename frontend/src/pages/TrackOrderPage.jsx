@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
-import api from '../api.js'
+import api, { API_BASE_URL } from '../api.js'
 
 const KITCHEN_STATUS_LABELS = {
   none: 'Menunggu Konfirmasi',
@@ -421,7 +421,7 @@ export default function TrackOrderPage() {
               {order.paymentStatus === 'paid' && (
                 <div style={{ marginTop: '0.75rem', textAlign: 'right' }}>
                   <a
-                    href={`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api'}/invoices/order/${order.orderCode}`}
+                    href={`${API_BASE_URL}/invoices/order/${order.orderCode}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn"

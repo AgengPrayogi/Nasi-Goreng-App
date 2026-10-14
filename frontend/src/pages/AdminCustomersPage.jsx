@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import './AdminCustomersPage.css';
 
 const AdminCustomersPage = () => {
@@ -19,7 +19,16 @@ const AdminCustomersPage = () => {
     search: ''
   });
 
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem('jwt') || localStorage.getItem('adminToken');
+
+  const updateAudienceSegment = async (customerId, audienceSegment) => {
+    try {
+      await api.patch(`/customers/${customerId}`, { audienceSegment }, { headers: { 'Authorization': `Bearer ${token}` } });
+      fetchCustomers();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal memperbarui segmen customer');
+    }
+  };
 
   useEffect(() => {
     if (currentView === 'list') {
@@ -42,8 +51,8 @@ const AdminCustomersPage = () => {
       if (filters.tier) params.append('tier', filters.tier);
       if (filters.search) params.append('search', filters.search);
 
-      const response = await axios.get(
-        `http://localhost:5000/api/customers?${params}`,
+      const response = await api.get(
+        `/customers?${params}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -60,8 +69,8 @@ const AdminCustomersPage = () => {
   const fetchTopCustomers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        'http://localhost:5000/api/customers/analytics/top?limit=20',
+      const response = await api.get(
+        '/customers/analytics/top?limit=20',
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setAnalytics(response.data.data);
@@ -75,8 +84,8 @@ const AdminCustomersPage = () => {
   const fetchSegments = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        'http://localhost:5000/api/customers/analytics/segments',
+      const response = await api.get(
+        '/customers/analytics/segments',
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setSegments(response.data.data);
@@ -90,8 +99,8 @@ const AdminCustomersPage = () => {
   const fetchChurnRisk = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        'http://localhost:5000/api/customers/analytics/churn-risk?days=30&limit=20',
+      const response = await api.get(
+        '/customers/analytics/churn-risk?days=30&limit=20',
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setChurnRiskCustomers(response.data.data);
@@ -105,8 +114,8 @@ const AdminCustomersPage = () => {
   const fetchRepeatRate = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        'http://localhost:5000/api/customers/analytics/repeat-rate',
+      const response = await api.get(
+        '/customers/analytics/repeat-rate',
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setRepeatRate(response.data.data);
@@ -119,8 +128,8 @@ const AdminCustomersPage = () => {
 
   const handleViewOrders = async (customerId) => {
     try {
-      const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/orders`,
+      const response = await api.get(
+        `/customers/${customerId}/orders`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setCustomerOrders(response.data.data);
@@ -221,6 +230,14 @@ const AdminCustomersPage = () => {
                     <div className="info-row">
                       <span className="label">Email:</span>
                       <span>{customer.email || '-'}</span>
+                    </div>
+                    <div className="info-row">
+                      <span className="label">Segmen:</span>
+                      <select value={customer.audienceSegment || 'individual'} onChange={(e) => updateAudienceSegment(customer._id, e.target.value)}>
+                        <option value="individual">Individu</option>
+                        <option value="family">Keluarga</option>
+                        <option value="organization">Organisasi</option>
+                      </select>
                     </div>
                     <div className="info-row">
                       <span className="label">Total Order:</span>

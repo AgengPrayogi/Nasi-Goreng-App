@@ -311,6 +311,64 @@ async function getInventoryPrediction() {
   };
 }
 
+async function getIngredientForecast(query = {}) {
+  const Ingredient = require('../models/Ingredient');
+  const StockMovement = require('../models/StockMovement');
+  const days = Math.max(1, Math.min(90, Number(query.days) || 7));
+  const since = new Date(Date.now() - 30 * 86400000);
+  const ingredients = await Ingredient.find({ isActive: true })
+    .select('name unit currentStock minimumStock')
+    .lean();
+
+  const usage = await StockMovement.aggregate([
+    { $match: { reason: 'order', createdAt: { $gte: since }, changeAmount: { $lt: 0 } } },
+    { $group: { _id: '$ingredient', used: { $sum: { $abs: '$changeAmount' } } } }
+  ]);
+  const usageMap = new Map(usage.map((row) => [String(row._id), row.used]));
+
+  const forecast = ingredients.map((ingredient) => {
+    const dailyUsage = Number(usageMap.get(String(ingredient._id)) || 0) / 30;
+    const predictedNeed = dailyUsage * days;
+    const recommendedOrder = Math.max(0, predictedNeed + Number(ingredient.minimumStock || 0) - Number(ingredient.currentStock || 0));
+    return {
+      ingredientId: ingredient._id,
+      name: ingredient.name,
+      unit: ingredient.unit,
+      currentStock: ingredient.currentStock,
+      dailyUsage: Math.round(dailyUsage * 100) / 100,
+      horizonDays: days,
+      predictedNeed: Math.round(predictedNeed * 100) / 100,
+      recommendedOrder: Math.ceil(recommendedOrder),
+      needsReorder: recommendedOrder > 0
+    };
+  });
+
+  return {
+    horizonDays: days,
+    generatedAt: new Date(),
+    forecast: forecast.sort((a, b) => b.recommendedOrder - a.recommendedOrder),
+    summary: {
+      ingredients: forecast.length,
+      needsReorder: forecast.filter((item) => item.needsReorder).length,
+      totalRecommendedUnits: forecast.reduce((sum, item) => sum + item.recommendedOrder, 0)
+    }
+  };
+}
+
+async function getForecastAccuracy(query = {}) {
+  const type = ['demand', 'revenue'].includes(query.type) ? query.type : 'demand';
+  const forecast = await Forecast.findOne({ type, status: 'ready' }).sort({ updatedAt: -1 }).lean();
+  if (!forecast) return { type, accuracy: 0, available: false, message: 'Belum ada forecast tersimpan' };
+  return {
+    type,
+    available: true,
+    accuracy: forecast.metadata?.accuracy || 0,
+    modelVersion: forecast.metadata?.modelVersion || 'unknown',
+    trainingDataRange: forecast.metadata?.trainingDataRange || null,
+    evaluatedAt: forecast.updatedAt
+  };
+}
+
 function calculateAccuracy(values) {
   if (values.length < 14) return 0;
 
@@ -375,5 +433,7 @@ module.exports = {
   getRevenueForecast,
   getCustomerChurnPrediction,
   getInventoryPrediction,
+  getIngredientForecast,
+  getForecastAccuracy,
   getUpsellOpportunities
 };

@@ -11,6 +11,21 @@ const menuIngredientSchema = Joi.object({
   })
 });
 
+const menuRecipePortionSchema = Joi.object({
+  label: Joi.string().trim().required().messages({
+    'string.empty': 'Portion label is required',
+    'any.required': 'Portion label is required'
+  }),
+  multiplier: Joi.number().min(0).default(1),
+  ingredients: Joi.array().items(menuIngredientSchema).default([])
+});
+
+const menuRecipeSchema = Joi.object({
+  version: Joi.string().trim().default('v1'),
+  notes: Joi.string().allow('').default(''),
+  portionSizes: Joi.array().items(menuRecipePortionSchema).default([])
+});
+
 const createMenuSchema = Joi.object({
   name: Joi.string().trim().required().messages({
     'string.empty': 'Menu name is required',
@@ -23,6 +38,7 @@ const createMenuSchema = Joi.object({
   description: Joi.string().allow('').default(''),
   imageUrl: Joi.string().allow('').default(''),
   ingredients: Joi.array().items(menuIngredientSchema).default([]),
+  recipe: menuRecipeSchema.optional(),
   costPrice: Joi.number().min(0).optional(),
   overheadAllocation: Joi.number().min(0).default(0),
   isAvailable: Joi.boolean().default(true)
@@ -34,6 +50,7 @@ const updateMenuSchema = Joi.object({
   description: Joi.string().allow('').optional(),
   imageUrl: Joi.string().allow('').optional(),
   ingredients: Joi.array().items(menuIngredientSchema).optional(),
+  recipe: menuRecipeSchema.optional(),
   costPrice: Joi.number().min(0).optional(),
   overheadAllocation: Joi.number().min(0).optional(),
   isAvailable: Joi.boolean().optional()

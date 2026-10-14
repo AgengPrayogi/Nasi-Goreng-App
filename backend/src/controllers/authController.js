@@ -14,7 +14,6 @@ function getClientIp(req) {
 }
 
 async function registerAdminHandler(req, res, next) {
-  console.log('📝 REGISTER ADMIN REQUEST:', JSON.stringify({ email: req.body?.email }));
   try {
     const admin = await registerAdmin(req.body, getClientIp(req));
     res.status(201).json({

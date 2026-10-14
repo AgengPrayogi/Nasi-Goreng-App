@@ -2,7 +2,9 @@ const {
   createMenu,
   getAllMenus,
   updateMenu,
-  deleteMenu
+  deleteMenu,
+  createMenuReview,
+  getMenuReviews
 } = require('../services/menuService');
 
 async function createMenuHandler(req, res, next) {
@@ -43,9 +45,29 @@ async function deleteMenuHandler(req, res, next) {
   }
 }
 
+async function createMenuReviewHandler(req, res, next) {
+  try {
+    const review = await createMenuReview(req.params.id, req.body);
+    res.status(201).json({ data: review });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getMenuReviewsHandler(req, res, next) {
+  try {
+    const reviews = await getMenuReviews(req.params.id);
+    res.json({ data: reviews });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createMenuHandler,
   getAllMenusHandler,
   updateMenuHandler,
-  deleteMenuHandler
+  deleteMenuHandler,
+  createMenuReviewHandler,
+  getMenuReviewsHandler
 };

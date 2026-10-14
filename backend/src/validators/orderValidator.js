@@ -17,14 +17,31 @@ const createOrderSchema = Joi.object({
     'any.required': 'Items array is required'
   }),
   notes: Joi.string().allow('').optional(),
-  channel: Joi.string().valid('dine_in', 'online').default('dine_in'),
+  channel: Joi.string().valid('dine_in', 'online', 'marketplace').default('dine_in'),
+  fulfillmentType: Joi.string().valid('dine_in', 'takeaway', 'delivery').default('takeaway'),
+  tableId: Joi.string().optional().allow(''),
+  deliveryAddress: Joi.string().allow('').optional(),
+  deliveryNotes: Joi.string().allow('').optional(),
+  promoCodeUsed: Joi.string().trim().allow('').optional(),
+  campaignId: Joi.string().optional().allow(''),
   customerName: Joi.string().trim().min(1).required().messages({
     'any.required': 'Customer name is required'
   }),
-  customerPhone: Joi.string().trim().min(1).required().messages({
-    'any.required': 'Customer phone is required'
-  })
+  customerPhone: Joi.string().trim()
+    .pattern(/^\+?[0-9][0-9\s().-]{6,18}$/)
+    .allow('')
+    .optional()
+    .messages({ 'string.pattern.base': 'Customer phone number is invalid' }),
+  whatsappConsent: Joi.object({
+    utility: Joi.boolean().default(false),
+    marketing: Joi.boolean().default(false)
+  }).default({})
 });
+
+const updateOrderSchema = Joi.object({
+  items: Joi.array().items(orderItemSchema).min(1).optional(),
+  notes: Joi.string().allow('').optional()
+}).min(1);
 
 const trackOrderParamsSchema = Joi.object({
   orderCode: Joi.string()
@@ -38,7 +55,7 @@ const trackOrderParamsSchema = Joi.object({
 });
 
 const kitchenStatusBodySchema = Joi.object({
-  kitchenStatus: Joi.string().valid('queued', 'preparing', 'ready', 'served').required()
+  kitchenStatus: Joi.string().valid('preparing', 'ready').required()
 });
 
 const paymentUpdateBodySchema = Joi.object({
@@ -65,7 +82,7 @@ const listOrdersQuerySchema = Joi.object({
   search: Joi.string().trim().allow('').optional(),
   orderCode: Joi.string().trim().uppercase().optional(),
   status: Joi.string().valid('pending', 'confirmed', 'completed', 'cancelled').optional(),
-  channel: Joi.string().valid('dine_in', 'online').optional(),
+  channel: Joi.string().valid('dine_in', 'online', 'marketplace').optional(),
   kitchenStatus: Joi.string().valid('none', 'queued', 'preparing', 'ready', 'served').optional(),
   paymentStatus: Joi.string().valid('unpaid', 'pending', 'paid', 'refunded').optional(),
   queueDate: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional()
@@ -88,6 +105,7 @@ const paymentWebhookSchema = Joi.object({
 
 module.exports = {
   createOrderSchema,
+  updateOrderSchema,
   trackOrderParamsSchema,
   kitchenStatusBodySchema,
   paymentUpdateBodySchema,

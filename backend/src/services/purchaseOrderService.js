@@ -1,6 +1,9 @@
+const mongoose = require('mongoose');
 const PurchaseOrder = require('../models/PurchaseOrder');
 const Ingredient = require('../models/Ingredient');
 const Supplier = require('../models/Supplier');
+const StockMovement = require('../models/StockMovement');
+const { createTransactionIfMissing } = require('./financeService');
 const { AppError, BusinessError } = require('../errors/AppError');
 
 /**
@@ -145,7 +148,17 @@ async function receivePurchaseOrder(poId, staffId = null) {
   }
 
   if (po.status === 'received') {
-    throw new BusinessError('Purchase order already received', 'ALREADY_RECEIVED');
+    await createTransactionIfMissing({
+      type: 'expense',
+      amount: Number(po.totalCost || 0),
+      description: `Purchase order received: ${po.poNumber || po._id}`,
+      category: 'restock',
+      reference: `PO-${po._id.toString()}`,
+      date: po.receivedDate || new Date(),
+      createdBy: staffId || undefined
+    });
+
+    return po.toObject();
   }
 
   // Update ingredient stock for each item
@@ -156,14 +169,33 @@ async function receivePurchaseOrder(poId, staffId = null) {
       ingredient.lastRestockDate = new Date();
       ingredient.lastRestockQty = item.quantity;
       await ingredient.save();
+
+      await StockMovement.create({
+        ingredient: ingredient._id,
+        changeAmount: item.quantity,
+        reason: 'restock',
+        reference: `PO-${po._id.toString()}`
+      });
     }
   }
 
   // Mark PO as received
   po.status = 'received';
   po.receivedDate = new Date();
-  po.receivedBy = staffId;
+  if (staffId && mongoose.Types.ObjectId.isValid(staffId)) {
+    po.receivedBy = staffId;
+  }
   await po.save();
+
+  await createTransactionIfMissing({
+    type: 'expense',
+    amount: Number(po.totalCost || 0),
+    description: `Purchase order received: ${po.poNumber || po._id}`,
+    category: 'restock',
+    reference: `PO-${po._id.toString()}`,
+    date: po.receivedDate,
+    createdBy: staffId || undefined
+  });
 
   return po.toObject();
 }

@@ -15,6 +15,7 @@ export default function Layout() {
 
   const handleLogout = () => {
     localStorage.removeItem('jwt')
+    localStorage.removeItem('adminToken')
     window.location.href = '/admin/login'
   }
 
@@ -40,6 +41,9 @@ export default function Layout() {
         { to: '/admin/suppliers', label: 'Suppliers', icon: '🚚' },
         { to: '/admin/purchase-orders', label: 'PO', icon: '📑' },
         { to: '/admin/reconciliation', label: 'Reconciliation', icon: '🔄' },
+        { to: '/admin/tables', label: 'Tables', icon: '🪑' },
+        { to: '/admin/reservations', label: 'Reservations', icon: '📅' },
+        { to: '/admin/marketplace', label: 'Marketplace', icon: '🛵' },
       ]
     },
     {

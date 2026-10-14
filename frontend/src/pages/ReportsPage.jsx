@@ -2,6 +2,16 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../api.js'
 
+const REPORT_ROUTE_BY_TEMPLATE = {
+  sales: 'sales',
+  menu_performance: 'menu-performance',
+  customer_analysis: 'customer-analysis',
+  staff_performance: 'staff-performance',
+  inventory: 'inventory',
+  financial: 'financial',
+  supplier: 'supplier',
+}
+
 export default function ReportsPage() {
   const queryClient = useQueryClient()
   const [dateFrom, setDateFrom] = useState('')
@@ -41,7 +51,7 @@ export default function ReportsPage() {
   async function handleGenerateReport() {
     setError('')
     try {
-      const path = `/reports/${selectedTemplate}`
+      const path = `/reports/${REPORT_ROUTE_BY_TEMPLATE[selectedTemplate]}`
       const res = await api.get(path, { params: queryParams })
       setCustomReport(res.data.data)
     } catch (err) {

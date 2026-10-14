@@ -1,7 +1,8 @@
 const DailyReconciliation = require('../models/DailyReconciliation');
 const Order = require('../models/Order');
 const AuditLog = require('../models/AuditLog');
-const AppError = require('../errors/AppError');
+require('../models/Staff'); // Register the model referenced by DailyReconciliation.closedBy.
+const { AppError } = require('../errors/AppError');
 
 /**
  * Daily Reconciliation Service
@@ -26,9 +27,9 @@ module.exports = {
 
       if (existing && existing.status !== 'open') {
         throw new AppError(
-          'DAY_ALREADY_CLOSED',
+          `Penjualan ${date} sudah ditutup`,
           409,
-          `Penjualan ${date} sudah ditutup`
+          'DAY_ALREADY_CLOSED'
         );
       }
 
@@ -88,8 +89,17 @@ module.exports = {
 
       // Calculate discrepancy
       const expectedTotal = stats.totalRevenue;
-      const actualTotal = actualData.actualTotal || expectedTotal;
+      const actualPayments = actualData.actualPaymentBreakdown || {};
+      const actualTotal = actualData.actualTotal || (
+        Number(actualPayments.cash || 0) + Number(actualPayments.transfer || 0) + Number(actualPayments.qris || 0)
+      ) || expectedTotal;
       const discrepancy = actualTotal - expectedTotal;
+      const expectedPayments = {
+        cash: stats.cashCount,
+        transfer: stats.transferCount,
+        qris: stats.qrisCount
+      };
+      const recordedActualPayments = actualData.actualPaymentBreakdown || expectedPayments;
 
       // Create or update DailyReconciliation
       let dailyRec = await DailyReconciliation.findOneAndUpdate(
@@ -103,6 +113,12 @@ module.exports = {
             transfer: stats.transferCount,
             qris: stats.qrisCount,
             other: 0
+          },
+          actualPaymentBreakdown: recordedActualPayments,
+          paymentDiscrepancy: {
+            cash: Number(recordedActualPayments.cash || 0) - expectedPayments.cash,
+            transfer: Number(recordedActualPayments.transfer || 0) - expectedPayments.transfer,
+            qris: Number(recordedActualPayments.qris || 0) - expectedPayments.qris
           },
           discountApplied: stats.totalDiscount,
           expectedTotal: expectedTotal,
@@ -145,8 +161,19 @@ module.exports = {
       return dailyRec;
     } catch (err) {
       if (err.name === 'AppError') throw err;
-      throw new AppError('CLOSE_DAY_ERROR', 500, err.message);
+      throw new AppError(err.message || 'Could not close sales day', 500, 'CLOSE_DAY_ERROR');
     }
+  },
+
+  async finalizeDay(date, staffId) {
+    const dailyRec = await DailyReconciliation.findOne({ date: new Date(date) });
+    if (!dailyRec) throw new AppError(`Data penjualan untuk ${date} tidak ditemukan`, 404, 'RECONCILIATION_NOT_FOUND');
+    if (dailyRec.status !== 'closed') throw new AppError('Hari harus berstatus closed sebelum difinalisasi', 409, 'INVALID_RECONCILIATION_STATUS');
+    dailyRec.status = 'finalized';
+    dailyRec.finalizedAt = new Date();
+    await dailyRec.save();
+    await AuditLog.create({ adminId: staffId, adminName: staffId, action: 'finalize_day', resource: 'DailyReconciliation', resourceId: dailyRec._id, description: `Finalisasi penjualan hari ${date}` });
+    return dailyRec;
   },
 
   /**
@@ -169,9 +196,9 @@ module.exports = {
 
       if (!dailyRec) {
         throw new AppError(
-          'RECONCILIATION_NOT_FOUND',
+          `Data penjualan untuk ${date} tidak ditemukan`,
           404,
-          `Data penjualan untuk ${date} tidak ditemukan`
+          'RECONCILIATION_NOT_FOUND'
         );
       }
 
@@ -189,7 +216,7 @@ module.exports = {
       };
     } catch (err) {
       if (err.name === 'AppError') throw err;
-      throw new AppError('GET_RECONCILIATION_ERROR', 500, err.message);
+      throw new AppError(err.message || 'Could not get reconciliation', 500, 'GET_RECONCILIATION_ERROR');
     }
   },
 
@@ -244,7 +271,7 @@ module.exports = {
         summary: summary.length > 0 ? summary[0] : {}
       };
     } catch (err) {
-      throw new AppError('GET_RANGE_ERROR', 500, err.message);
+      throw new AppError(err.message || 'Could not get reconciliation range', 500, 'GET_RANGE_ERROR');
     }
   },
 
@@ -287,7 +314,7 @@ module.exports = {
         }
       };
     } catch (err) {
-      throw new AppError('COMPARE_ERROR', 500, err.message);
+      throw new AppError(err.message || 'Could not compare reconciliations', 500, 'COMPARE_ERROR');
     }
   },
 
@@ -355,7 +382,7 @@ module.exports = {
         }
       };
     } catch (err) {
-      throw new AppError('GET_MONTHLY_ERROR', 500, err.message);
+      throw new AppError(err.message || 'Could not get monthly reconciliation', 500, 'GET_MONTHLY_ERROR');
     }
   },
 
@@ -422,7 +449,7 @@ module.exports = {
 
       return trend;
     } catch (err) {
-      throw new AppError('GET_TREND_ERROR', 500, err.message);
+      throw new AppError(err.message || 'Could not get reconciliation trend', 500, 'GET_TREND_ERROR');
     }
   },
 
@@ -477,7 +504,7 @@ module.exports = {
         riskLevel: this._calculateRiskLevel(data)
       };
     } catch (err) {
-      throw new AppError('GET_HEALTH_ERROR', 500, err.message);
+      throw new AppError(err.message || 'Could not get reconciliation health metrics', 500, 'GET_HEALTH_ERROR');
     }
   },
 

@@ -36,9 +36,17 @@ async function updateCampaignHandler(req, res, next) {
   }
 }
 
+async function evaluateCampaignHandler(req, res, next) {
+  try {
+    const data = await campaignService.evaluateCampaign(req.params.id);
+    res.json({ data, message: 'Campaign audience evaluated' });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   listCampaignsHandler,
   getCampaignHandler,
   createCampaignHandler,
-  updateCampaignHandler
+  updateCampaignHandler,
+  evaluateCampaignHandler
 };

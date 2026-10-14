@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import './AdminPurchaseOrdersPage.css';
 
 const AdminPurchaseOrdersPage = () => {
@@ -19,7 +19,7 @@ const AdminPurchaseOrdersPage = () => {
     notes: ''
   });
 
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem('jwt') || localStorage.getItem('adminToken');
 
   useEffect(() => {
     fetchPurchaseOrders();
@@ -33,8 +33,8 @@ const AdminPurchaseOrdersPage = () => {
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
 
-      const response = await axios.get(
-        `http://localhost:5000/api/purchase-orders?${params}`,
+      const response = await api.get(
+        `/purchase-orders?${params}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -48,8 +48,8 @@ const AdminPurchaseOrdersPage = () => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await axios.get(
-        'http://localhost:5000/api/suppliers?isActive=true&limit=100',
+      const response = await api.get(
+        '/suppliers?isActive=true&limit=100',
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setSuppliers(response.data.data);
@@ -60,8 +60,8 @@ const AdminPurchaseOrdersPage = () => {
 
   const fetchIngredients = async () => {
     try {
-      const response = await axios.get(
-        'http://localhost:5000/api/ingredients?limit=200',
+      const response = await api.get(
+        '/ingredients?limit=200',
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
       setIngredients(response.data.data);
@@ -103,8 +103,8 @@ const AdminPurchaseOrdersPage = () => {
         }))
       };
 
-      const response = await axios.post(
-        'http://localhost:5000/api/purchase-orders',
+      const response = await api.post(
+        '/purchase-orders',
         payload,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
@@ -121,8 +121,8 @@ const AdminPurchaseOrdersPage = () => {
   const handleReceivePO = async (poId) => {
     if (window.confirm('Terima PO ini? Stock akan otomatis terupdate.')) {
       try {
-        const response = await axios.patch(
-          `http://localhost:5000/api/purchase-orders/${poId}/receive`,
+        const response = await api.patch(
+          `/purchase-orders/${poId}/receive`,
           {},
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
@@ -141,8 +141,8 @@ const AdminPurchaseOrdersPage = () => {
     const reason = prompt('Alasan pembatalan:');
     if (reason) {
       try {
-        const response = await axios.patch(
-          `http://localhost:5000/api/purchase-orders/${poId}/cancel`,
+        const response = await api.patch(
+          `/purchase-orders/${poId}/cancel`,
           { reason },
           { headers: { 'Authorization': `Bearer ${token}` } }
         );

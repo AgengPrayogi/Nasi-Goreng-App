@@ -6,7 +6,8 @@ const {
   compareHandler,
   getMonthlyHandler,
   getTrendHandler,
-  getHealthMetricsHandler
+  getHealthMetricsHandler,
+  finalizeDayHandler
 } = require('../controllers/reconciliationController');
 const { authenticate, requireAdmin } = require('../middlewares/auth');
 
@@ -17,6 +18,7 @@ router.use(authenticate, requireAdmin);
 
 // Close daily sales
 router.post('/close', closeDayHandler);
+router.post('/:date/finalize', finalizeDayHandler);
 
 // Get daily reconciliation
 router.get('/:date', getDailyHandler);

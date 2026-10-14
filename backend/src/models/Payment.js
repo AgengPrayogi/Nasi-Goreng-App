@@ -36,8 +36,6 @@ const PaymentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-PaymentSchema.index({ externalPaymentId: 1 });
-PaymentSchema.index({ order: 1 });
 PaymentSchema.index({ status: 1, expiresAt: 1 });
 
 module.exports = mongoose.model('Payment', PaymentSchema);

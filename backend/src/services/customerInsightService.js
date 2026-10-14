@@ -1,5 +1,7 @@
 const Order = require('../models/Order');
 const Customer = require('../models/Customer');
+const Menu = require('../models/Menu');
+const MenuReview = require('../models/MenuReview');
 
 async function getRfmAnalysis() {
   const customers = await Customer.find({ isActive: true })
@@ -293,9 +295,79 @@ async function getCustomerRecommendations(customerId) {
   return recommendations;
 }
 
+async function getProductRecommendations(limit = 10) {
+  const [menus, salesRows, reviewRows] = await Promise.all([
+    Menu.find({ isAvailable: true }).select('_id name price').sort({ name: 1 }).lean(),
+    Order.aggregate([
+      { $match: { status: 'completed' } },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.menu',
+          totalQuantity: { $sum: '$items.quantity' },
+          orderCount: { $sum: 1 }
+        }
+      }
+    ]),
+    MenuReview.aggregate([
+      { $match: { status: 'approved' } },
+      {
+        $group: {
+          _id: '$menu',
+          averageRating: { $avg: '$rating' },
+          reviewCount: { $sum: 1 }
+        }
+      }
+    ])
+  ]);
+
+  const salesByMenu = new Map();
+  for (const row of salesRows) {
+    salesByMenu.set(String(row._id), {
+      totalQuantity: Number(row.totalQuantity || 0),
+      orderCount: Number(row.orderCount || 0)
+    });
+  }
+
+  const reviewByMenu = new Map();
+  for (const row of reviewRows) {
+    reviewByMenu.set(String(row._id), {
+      averageRating: Number(row.averageRating || 0),
+      reviewCount: Number(row.reviewCount || 0)
+    });
+  }
+
+  const recommendations = menus.map((menu) => {
+    const sales = salesByMenu.get(String(menu._id)) || { totalQuantity: 0, orderCount: 0 };
+    const review = reviewByMenu.get(String(menu._id)) || { averageRating: 0, reviewCount: 0 };
+
+    const popularityScore = (sales.totalQuantity * 2.5) + (sales.orderCount * 6);
+    const reviewScore = review.reviewCount > 0 ? (review.averageRating * 16) + (review.reviewCount * 2) : 3;
+    const availabilityBoost = menu.price && menu.price > 0 ? 1 : 0;
+    const score = popularityScore + reviewScore + availabilityBoost;
+
+    return {
+      menuId: menu._id,
+      menuName: menu.name,
+      price: menu.price,
+      salesQuantity: sales.totalQuantity,
+      orderCount: sales.orderCount,
+      avgRating: review.reviewCount > 0 ? Number((review.averageRating).toFixed(2)) : 0,
+      reviewCount: review.reviewCount,
+      score: Number(score.toFixed(2)),
+      reason: review.reviewCount > 0
+        ? `Popularitas penjualan dan rating ${review.averageRating.toFixed(1)}/5 dari ${review.reviewCount} ulasan`
+        : 'Belum ada cukup feedback pelanggan; memakai popularitas penjualan sebagai sinyal utama'
+    };
+  }).sort((a, b) => b.score - a.score || b.salesQuantity - a.salesQuantity || b.avgRating - a.avgRating);
+
+  return recommendations.slice(0, Number(limit) || 10);
+}
+
 module.exports = {
   getRfmAnalysis,
   getCustomerIntelligence,
   getCustomerSegments,
-  getCustomerRecommendations
+  getCustomerRecommendations,
+  getProductRecommendations
 };

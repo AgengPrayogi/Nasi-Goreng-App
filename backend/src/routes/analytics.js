@@ -33,6 +33,7 @@ router.get('/customer-segments', analyticsController.customerSegmentsHandler);
 router.get('/rfm-analysis', analyticsController.rfmAnalysisHandler);
 router.get('/customer-journey/:customerId', analyticsController.customerJourneyHandler);
 router.get('/customer-recommendations/:customerId', analyticsController.customerRecommendationsHandler);
+router.get('/product-recommendations', analyticsController.productRecommendationsHandler);
 router.post('/segment-customers', analyticsController.segmentCustomersHandler);
 
 // --- Forecasting ---
@@ -40,6 +41,8 @@ router.get('/forecasting/demand', analyticsController.demandForecastHandler);
 router.get('/forecasting/revenue', analyticsController.revenueForecastHandler);
 router.get('/forecasting/customer-churn', analyticsController.customerChurnHandler);
 router.get('/forecasting/inventory', analyticsController.inventoryPredictionHandler);
+router.get('/forecasting/ingredient-forecast', analyticsController.ingredientForecastHandler);
+router.get('/forecasting/accuracy', analyticsController.forecastAccuracyHandler);
 router.get('/forecasting/opportunities', analyticsController.upsellOpportunitiesHandler);
 
 // --- Promotion Analytics ---

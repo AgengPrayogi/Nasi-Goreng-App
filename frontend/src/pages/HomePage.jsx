@@ -66,6 +66,9 @@ export default function HomePage() {
             <Link to="/track" className="btn" style={{ background: 'transparent', border: '2px solid var(--yellow)', color: 'var(--yellow)', padding: '0.75rem 2rem', fontSize: '1rem', textDecoration: 'none' }}>
               Lacak Pesanan
             </Link>
+            <Link to="/reserve" className="btn" style={{ background: 'transparent', border: '2px solid rgba(255,255,255,0.7)', color: 'var(--white)', padding: '0.75rem 2rem', fontSize: '1rem', textDecoration: 'none' }}>
+              Reservasi Meja
+            </Link>
           </div>
         </div>
       </div>

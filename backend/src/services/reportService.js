@@ -351,7 +351,16 @@ async function listSavedReports(adminId) {
 }
 
 async function saveReport(data, adminId) {
-  return SavedReport.create({ ...data, createdBy: adminId });
+  const report = await SavedReport.create({ ...data, createdBy: adminId });
+  if (report.schedule?.enabled && report.schedule?.recipients?.length && !report.schedule.nextSend) {
+    const nextSend = new Date();
+    if (report.schedule.frequency === 'daily') nextSend.setDate(nextSend.getDate() + 1);
+    else if (report.schedule.frequency === 'monthly') nextSend.setMonth(nextSend.getMonth() + 1);
+    else nextSend.setDate(nextSend.getDate() + 7);
+    report.schedule.nextSend = nextSend;
+    await report.save();
+  }
+  return report;
 }
 
 async function deleteSavedReport(id, adminId) {

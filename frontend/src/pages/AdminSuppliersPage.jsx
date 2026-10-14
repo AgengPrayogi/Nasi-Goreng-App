@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import './AdminSuppliersPage.css';
 
 const AdminSuppliersPage = () => {
@@ -20,7 +20,7 @@ const AdminSuppliersPage = () => {
     paymentTerms: 'NET 30'
   });
 
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem('jwt') || localStorage.getItem('adminToken');
 
   useEffect(() => {
     fetchSuppliers();
@@ -33,8 +33,8 @@ const AdminSuppliersPage = () => {
       if (filters.search) params.append('search', filters.search);
       params.append('isActive', 'true');
 
-      const response = await axios.get(
-        `http://localhost:5000/api/suppliers?${params}`,
+      const response = await api.get(
+        `/suppliers?${params}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -52,12 +52,12 @@ const AdminSuppliersPage = () => {
     try {
       setLoading(true);
       const url = editingId 
-        ? `http://localhost:5000/api/suppliers/${editingId}`
-        : 'http://localhost:5000/api/suppliers';
+        ? `/suppliers/${editingId}`
+        : '/suppliers';
 
       const method = editingId ? 'patch' : 'post';
 
-      const response = await axios[method](url, formData, {
+      const response = await api[method](url, formData, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -77,7 +77,7 @@ const AdminSuppliersPage = () => {
   const handleDelete = async (supplierId) => {
     if (window.confirm('Hapus supplier ini?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/suppliers/${supplierId}`, {
+        await api.delete(`/suppliers/${supplierId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         setSuppliers(suppliers.filter(s => s._id !== supplierId));

@@ -1,5 +1,5 @@
 const reconciliationService = require('../services/reconciliationService');
-const AppError = require('../errors/AppError');
+const { AppError } = require('../errors/AppError');
 
 /**
  * Daily Reconciliation Controller
@@ -13,16 +13,16 @@ module.exports = {
    */
   async closeDayHandler(req, res, next) {
     try {
-      const { date, actualTotal, notes } = req.body;
+      const { date, actualTotal, actualPaymentBreakdown, notes } = req.body;
 
       if (!date) {
-        throw new AppError('MISSING_DATE', 400, 'Tanggal penjualan harus diisi');
+        throw new AppError('Tanggal penjualan harus diisi', 400, 'MISSING_DATE');
       }
 
       const result = await reconciliationService.closeDay(
         date,
-        req.user.sub,
-        { actualTotal, notes }
+        req.user.id,
+        { actualTotal, actualPaymentBreakdown, notes }
       );
 
       res.status(201).json({
@@ -35,6 +35,13 @@ module.exports = {
     }
   },
 
+  async finalizeDayHandler(req, res, next) {
+    try {
+      const result = await reconciliationService.finalizeDay(req.params.date, req.user.id);
+      res.json({ success: true, message: `Penjualan ${req.params.date} berhasil difinalisasi`, data: result });
+    } catch (err) { next(err); }
+  },
+
   /**
    * Get daily reconciliation
    * GET /api/reconciliation/:date
@@ -44,7 +51,7 @@ module.exports = {
       const { date } = req.params;
 
       if (!date) {
-        throw new AppError('MISSING_DATE', 400, 'Tanggal harus diisi');
+        throw new AppError('Tanggal harus diisi', 400, 'MISSING_DATE');
       }
 
       const result = await reconciliationService.getDailyReconciliation(date);
@@ -69,9 +76,9 @@ module.exports = {
 
       if (!from || !to) {
         throw new AppError(
-          'MISSING_DATES',
+          'Parameter from dan to harus diisi',
           400,
-          'Parameter from dan to harus diisi'
+          'MISSING_DATES'
         );
       }
 
@@ -100,9 +107,9 @@ module.exports = {
 
       if (!date1 || !date2) {
         throw new AppError(
-          'MISSING_DATES',
+          'Parameter date1 dan date2 harus diisi',
           400,
-          'Parameter date1 dan date2 harus diisi'
+          'MISSING_DATES'
         );
       }
 
@@ -127,9 +134,9 @@ module.exports = {
 
       if (!year || !month) {
         throw new AppError(
-          'MISSING_PERIOD',
+          'Tahun dan bulan harus diisi',
           400,
-          'Tahun dan bulan harus diisi'
+          'MISSING_PERIOD'
         );
       }
 
@@ -155,18 +162,18 @@ module.exports = {
 
       if (!from || !to) {
         throw new AppError(
-          'MISSING_DATES',
+          'Parameter from dan to harus diisi',
           400,
-          'Parameter from dan to harus diisi'
+          'MISSING_DATES'
         );
       }
 
       const validGranularities = ['daily', 'weekly', 'monthly'];
       if (!validGranularities.includes(granularity)) {
         throw new AppError(
-          'INVALID_GRANULARITY',
+          'Granularitas harus: daily, weekly, atau monthly',
           400,
-          'Granularitas harus: daily, weekly, atau monthly'
+          'INVALID_GRANULARITY'
         );
       }
 
@@ -192,9 +199,9 @@ module.exports = {
 
       if (!from || !to) {
         throw new AppError(
-          'MISSING_DATES',
+          'Parameter from dan to harus diisi',
           400,
-          'Parameter from dan to harus diisi'
+          'MISSING_DATES'
         );
       }
 

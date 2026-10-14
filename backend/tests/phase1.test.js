@@ -1,6 +1,29 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const app = require('../src/app');
+let replSet;
+
+beforeAll(async () => {
+  replSet = await MongoMemoryReplSet.create({ replSet: { name: 'phase1-rs', count: 1 } });
+  process.env.MONGODB_URI = replSet.getUri();
+  process.env.JWT_SECRET = 'phase1-test-jwt-secret-key-minimum-32-characters';
+  process.env.NODE_ENV = 'test';
+  process.env.EMAIL_SERVICE = 'mock';
+  process.env.ALLOW_ADMIN_REGISTER = 'true';
+  await require('../src/config/db').connectDB();
+  const password = 'Admin@123456';
+  const email = process.env.ADMIN_EMAIL || 'admin@test.com';
+  await request(app).post('/api/auth/register-admin').send({ email, password, confirmPassword: password }).expect(201);
+  const Admin = require('../src/models/Admin');
+  await Admin.updateOne({ email }, { isVerified: true });
+  process.env.ALLOW_ADMIN_REGISTER = 'false';
+});
+
+afterAll(async () => {
+  if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
+  if (replSet) await replSet.stop();
+});
 
 // This test suite assumes the app is properly configured
 // Tests cover basic Phase 1 functionality
@@ -17,8 +40,6 @@ describe('Staff Management API', () => {
   };
 
   beforeAll(async () => {
-    // Login as admin to get token
-    // Note: Assumes admin already exists in DB
     const loginRes = await request(app)
       .post('/api/auth/login')
       .send({
@@ -28,6 +49,7 @@ describe('Staff Management API', () => {
 
     adminToken = loginRes.body.data?.token;
   });
+
 
   describe('POST /api/staff', () => {
     it('should create new staff', async () => {
@@ -93,7 +115,7 @@ describe('Staff Management API', () => {
           password: 'WrongPass@123'
         });
 
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
     });
   });
@@ -137,7 +159,7 @@ describe('Staff Management API', () => {
         .get(`/api/staff/invalid_id`)
         .set('Authorization', `Bearer ${adminToken}`);
 
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(400);
       expect(res.body.success).toBe(false);
     });
   });
@@ -177,7 +199,7 @@ describe('Staff Management API', () => {
           password: testStaff.password
         });
 
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(403);
     });
   });
 });

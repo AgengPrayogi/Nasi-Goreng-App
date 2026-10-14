@@ -23,8 +23,16 @@ export default function PublicOrderPage() {
   const navigate = useNavigate()
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [whatsAppUtilityConsent, setWhatsAppUtilityConsent] = useState(false)
+  const [whatsAppMarketingConsent, setWhatsAppMarketingConsent] = useState(false)
   const [orderItems, setOrderItems] = useState([])
   const [notes, setNotes] = useState('')
+  const [fulfillmentType, setFulfillmentType] = useState('takeaway')
+  const [tableId, setTableId] = useState('')
+  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [promoCode, setPromoCode] = useState('')
+  const [promoResult, setPromoResult] = useState(null)
+  const [promoError, setPromoError] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')
   const [showSuccess, setShowSuccess] = useState(false)
   const [orderCode, setOrderCode] = useState('')
@@ -37,6 +45,12 @@ export default function PublicOrderPage() {
       const res = await api.get('/menus')
       return res.data
     },
+  })
+  const { data: tableData } = useQuery({
+    queryKey: ['available-tables'],
+    queryFn: async () => (await api.get('/tables/available')).data,
+    enabled: fulfillmentType === 'dine_in',
+    refetchInterval: fulfillmentType === 'dine_in' ? 10000 : false,
   })
 
   const createOrder = useMutation({
@@ -106,6 +120,7 @@ export default function PublicOrderPage() {
   }
 
   const total = orderItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+  const finalTotal = promoResult?.finalAmount ?? total
   const formatPrice = (price) => `Rp ${Number(price).toLocaleString('id-ID')}`
 
   const handleSubmit = (e) => {
@@ -114,11 +129,35 @@ export default function PublicOrderPage() {
     const payload = {
       items: orderItems.map((i) => ({ menuId: i.menuId, name: i.name, price: i.price, quantity: i.quantity })),
       notes: notes || undefined,
-      channel: 'online',
+      channel: fulfillmentType === 'dine_in' ? 'dine_in' : 'online',
+      fulfillmentType,
+      tableId: tableId || undefined,
+      deliveryAddress: deliveryAddress || undefined,
+      promoCodeUsed: promoCode || undefined,
       customerName: customerName || undefined,
       customerPhone: customerPhone || undefined,
+      whatsappConsent: {
+        utility: whatsAppUtilityConsent,
+        marketing: whatsAppMarketingConsent
+      },
     }
     createOrder.mutate(payload)
+  }
+
+  const applyPromo = async () => {
+    if (!promoCode.trim()) return
+    try {
+      setPromoError('')
+      const result = await api.get(`/promotions/validate/${encodeURIComponent(promoCode.trim())}`)
+      const discount = result.data.data
+      const amount = discount.promotion.type === 'percentage'
+        ? Math.min(total * discount.promotion.discountValue / 100, discount.promotion.maximumDiscount || Infinity)
+        : discount.promotion.discountValue
+      setPromoResult({ ...discount, discountAmount: Math.round(amount), finalAmount: Math.max(0, Math.round(total - amount)) })
+    } catch (err) {
+      setPromoResult(null)
+      setPromoError(err.response?.data?.message || 'Promo code tidak valid')
+    }
   }
 
   const availableMenus = menus.filter((m) => m.available !== false)
@@ -447,17 +486,70 @@ export default function PublicOrderPage() {
                 {/* Customer Info */}
                 <div className="card" style={{ marginBottom: '1rem', background: '#fafafa' }}>
                   <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                    <label>👤 Nama (opsional)</label>
-                    <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Nama Anda" />
+                    <label>🍽️ Cara menerima pesanan</label>
+                    <select value={fulfillmentType} onChange={(e) => { setFulfillmentType(e.target.value); setTableId('') }}>
+                      <option value="takeaway">Takeaway</option>
+                      <option value="dine_in">Dine-in</option>
+                      <option value="delivery">Delivery</option>
+                    </select>
+                  </div>
+                  {fulfillmentType === 'dine_in' && (
+                    <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                      <label>🪑 Meja</label>
+                      <select required value={tableId} onChange={(e) => setTableId(e.target.value)}>
+                        <option value="">Pilih meja</option>
+                        {(tableData?.data || []).map((table) => <option key={table._id} value={table._id}>Meja {table.number} · {table.area} · {table.capacity} kursi</option>)}
+                      </select>
+                      {(tableData?.data || []).length === 0 && <small>Belum ada meja tersedia. Silakan pilih takeaway atau delivery.</small>}
+                    </div>
+                  )}
+                  {fulfillmentType === 'delivery' && (
+                    <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                      <label>📍 Alamat delivery</label>
+                      <textarea required value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} placeholder="Alamat lengkap pengantaran" rows={2} />
+                    </div>
+                  )}
+                  <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                    <label>👤 Nama *</label>
+                    <input type="text" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Nama Anda" />
                   </div>
                   <div className="form-group" style={{ marginBottom: '0.75rem' }}>
                     <label>📞 No. Telepon (opsional)</label>
-                    <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="08xxxxxxxxxx" />
+                    <input type="tel" maxLength="20" value={customerPhone} onChange={(e) => {
+                      setCustomerPhone(e.target.value)
+                      if (!e.target.value.trim()) {
+                        setWhatsAppUtilityConsent(false)
+                        setWhatsAppMarketingConsent(false)
+                      }
+                    }} placeholder="Isi jika ingin riwayat pelanggan / pemesanan ulang" />
                   </div>
+                  {customerPhone.trim() ? <fieldset style={{ border: '1px solid var(--gray-300)', borderRadius: 4, padding: '0.75rem', margin: '0 0 0.75rem' }}>
+                    <legend style={{ padding: '0 0.35rem', fontSize: '0.9rem' }}>Pesan WhatsApp (opsional)</legend>
+                    <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      <input type="checkbox" checked={whatsAppUtilityConsent} onChange={(event) => setWhatsAppUtilityConsent(event.target.checked)} />
+                      <span>Saya setuju menerima update transaksi pesanan dari Nasi Goreng Polonia melalui WhatsApp.</span>
+                    </label>
+                    <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                      <input type="checkbox" checked={whatsAppMarketingConsent} onChange={(event) => setWhatsAppMarketingConsent(event.target.checked)} />
+                      <span>Saya setuju menerima promo dan rekomendasi menu dari Nasi Goreng Polonia melalui WhatsApp.</span>
+                    </label>
+                  </fieldset> : <p style={{ fontSize: '0.85rem', color: 'var(--gray-600)', margin: '0 0 0.75rem' }}>Nomor telepon tidak wajib. Isi jika ingin pesanan dihubungkan ke riwayat pelanggan; persetujuan WhatsApp tersedia setelah nomor diisi.</p>}
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label>📝 Catatan (opsional)</label>
                     <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Catatan untuk pesanan..." rows={2} style={{ width: '100%', resize: 'vertical' }} />
                   </div>
+                </div>
+
+                <div className="card" style={{ marginBottom: '1rem', background: '#f3f8ff' }}>
+                  <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                    <label>🎟️ Kode promo</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input value={promoCode} onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoResult(null) }} placeholder="Masukkan kode promo" />
+                      <button type="button" className="btn btn-gray" onClick={applyPromo}>Gunakan</button>
+                    </div>
+                  </div>
+                  {promoResult && <div style={{ color: '#2e7d32', fontSize: '0.85rem' }}>Promo aktif: hemat {formatPrice(promoResult.discountAmount)}</div>}
+                  {promoError && <div style={{ color: 'var(--red)', fontSize: '0.85rem' }}>{promoError}</div>}
                 </div>
 
                 {/* Total */}
@@ -473,7 +565,7 @@ export default function PublicOrderPage() {
                   borderRadius: '8px',
                 }}>
                   <span>Total:</span>
-                  <span style={{ color: 'var(--red)', fontSize: '1.5rem' }}>{formatPrice(total)}</span>
+                  <span style={{ color: 'var(--red)', fontSize: '1.5rem' }}>{formatPrice(finalTotal)}</span>
                 </div>
 
                 <button

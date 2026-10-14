@@ -7,6 +7,7 @@ const {
   listKitchenQueue,
   getOrderById,
   getOrderPublicByCode,
+  updateOrder,
   updateKitchenStatus,
   updatePayment
 } = require('../services/orderService');
@@ -98,6 +99,15 @@ async function getOrderHandler(req, res, next) {
   }
 }
 
+async function updateOrderHandler(req, res, next) {
+  try {
+    const order = await updateOrder(req.params.id, req.body);
+    res.json({ data: order });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function cancelOrderHandler(req, res, next) {
   try {
     const { id } = req.params;
@@ -137,6 +147,7 @@ module.exports = {
   listOrdersHandler,
   listKitchenQueueHandler,
   getOrderHandler,
+  updateOrderHandler,
   trackOrderHandler,
   updateKitchenStatusHandler,
   updatePaymentHandler

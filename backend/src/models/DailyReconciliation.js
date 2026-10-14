@@ -34,6 +34,16 @@ const DailyReconciliationSchema = new mongoose.Schema(
         min: 0
       }
     },
+    actualPaymentBreakdown: {
+      cash: { type: Number, default: 0, min: 0 },
+      transfer: { type: Number, default: 0, min: 0 },
+      qris: { type: Number, default: 0, min: 0 }
+    },
+    paymentDiscrepancy: {
+      cash: { type: Number, default: 0 },
+      transfer: { type: Number, default: 0 },
+      qris: { type: Number, default: 0 }
+    },
     discountApplied: {
       type: Number,
       default: 0,
@@ -70,6 +80,10 @@ const DailyReconciliationSchema = new mongoose.Schema(
       required: false
     },
     closedAt: {
+      type: Date,
+      required: false
+    },
+    finalizedAt: {
       type: Date,
       required: false
     }

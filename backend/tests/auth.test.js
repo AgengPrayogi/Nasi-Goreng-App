@@ -383,9 +383,10 @@ describe('Auth Registration & Verification Flow', () => {
   });
 
   // -----------------------------------------------------------------------
-  // 16. Emails mocked in test mode — link contains correct frontend URL
+  // 16. Mock email delivery must not expose verification tokens in logs
   // -----------------------------------------------------------------------
-  test('console output during registration contains correct verification link (dev/mock mode)', async () => {
+  test('console output during registration does not expose verification token', async () => {
+    const Admin = require('../src/models/Admin');
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
     process.env.ALLOW_ADMIN_REGISTER = 'true';
@@ -396,13 +397,9 @@ describe('Auth Registration & Verification Flow', () => {
     process.env.ALLOW_ADMIN_REGISTER = 'false';
 
     const calls = consoleSpy.mock.calls;
-    const emailLog = calls.find(call =>
-      call[0] === '📧 Email would be sent (dev/mock mode):'
-    );
-
-    expect(emailLog).toBeTruthy();
-    expect(emailLog[1].link).toContain(frontendUrl);
-    expect(emailLog[1].link).toContain('/verify-email/');
+    const admin = await Admin.findOne({ email: 'linkcheck@example.com' });
+    expect(admin.verificationToken).toBeTruthy();
+    expect(JSON.stringify(calls)).not.toContain(admin.verificationToken);
 
     consoleSpy.mockRestore();
   });

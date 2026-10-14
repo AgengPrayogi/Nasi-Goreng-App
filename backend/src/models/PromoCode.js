@@ -41,7 +41,6 @@ const PromoCodeSchema = new mongoose.Schema(
 );
 
 // Index for quick code lookup
-PromoCodeSchema.index({ code: 1 });
 PromoCodeSchema.index({ promotionId: 1 });
 PromoCodeSchema.index({ isActive: 1 });
 

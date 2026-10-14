@@ -37,7 +37,13 @@ const PurchaseOrderSchema = new mongoose.Schema(
       type: String,
       unique: true,
       required: true,
-      trim: true
+      trim: true,
+      default: function() {
+        const date = new Date();
+        const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+        const nextNum = String(Math.floor(Math.random() * 90000) + 10000);
+        return `PO-${dateStr}-${nextNum}`;
+      }
     },
     supplierId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -85,9 +91,8 @@ const PurchaseOrderSchema = new mongoose.Schema(
 );
 
 // Auto-generate PO number if not provided
-PurchaseOrderSchema.pre('save', async function(next) {
+PurchaseOrderSchema.pre('validate', async function(next) {
   if (!this.poNumber) {
-    // Generate PO number: PO-YYYYMMDD-XXXXX
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
     const lastPO = await mongoose.model('PurchaseOrder').findOne({}).sort({ createdAt: -1 });
@@ -101,7 +106,6 @@ PurchaseOrderSchema.pre('save', async function(next) {
 // Indexes for common queries
 PurchaseOrderSchema.index({ supplierId: 1, status: 1 });
 PurchaseOrderSchema.index({ status: 1, createdAt: -1 });
-PurchaseOrderSchema.index({ poNumber: 1 });
 PurchaseOrderSchema.index({ orderDate: -1 });
 PurchaseOrderSchema.index({ expectedDate: 1 });
 

@@ -3,14 +3,28 @@ const Menu = require('../models/Menu');
 const { BusinessError, NotFoundError } = require('../errors/AppError');
 
 async function createIngredient(data) {
-  const { name, unit = 'pcs', costPerUnit = 0, currentStock = 0, minimumStock = 0 } = data;
+  const {
+    name,
+    unit = 'pcs',
+    costPerUnit = 0,
+    currentStock = data.stock ?? 0,
+    minimumStock = data.minStock ?? 0,
+    checkFrequency = 'weekly',
+    nextCheckAt = null,
+    lastCheckedAt = null,
+    inspectionNotes = ''
+  } = data;
 
   const ingredient = new Ingredient({
     name: name.trim(),
     unit,
     costPerUnit,
     currentStock,
-    minimumStock
+    minimumStock,
+    checkFrequency,
+    nextCheckAt: nextCheckAt ? new Date(nextCheckAt) : null,
+    lastCheckedAt: lastCheckedAt ? new Date(lastCheckedAt) : null,
+    inspectionNotes
   });
 
   try {
@@ -34,7 +48,17 @@ async function updateIngredient(id, data) {
     throw new NotFoundError('Ingredient');
   }
 
-  const { name, unit, costPerUnit, currentStock, minimumStock } = data;
+  const {
+    name,
+    unit,
+    costPerUnit,
+    currentStock = data.stock,
+    minimumStock = data.minStock,
+    checkFrequency,
+    nextCheckAt,
+    lastCheckedAt,
+    inspectionNotes
+  } = data;
 
   // INVARIANT: Cannot update currentStock directly via API
   if (currentStock !== undefined) {
@@ -51,6 +75,10 @@ async function updateIngredient(id, data) {
   if (unit !== undefined) ingredient.unit = unit;
   if (costPerUnit !== undefined) ingredient.costPerUnit = costPerUnit;
   if (minimumStock !== undefined) ingredient.minimumStock = minimumStock;
+  if (checkFrequency !== undefined) ingredient.checkFrequency = checkFrequency;
+  if (nextCheckAt !== undefined) ingredient.nextCheckAt = nextCheckAt ? new Date(nextCheckAt) : null;
+  if (lastCheckedAt !== undefined) ingredient.lastCheckedAt = lastCheckedAt ? new Date(lastCheckedAt) : null;
+  if (inspectionNotes !== undefined) ingredient.inspectionNotes = inspectionNotes;
 
   try {
     await ingredient.save();
@@ -95,10 +123,18 @@ async function getLowStockIngredients() {
   }).sort({ currentStock: 1 });
 }
 
+async function getIngredientReminders() {
+  return Ingredient.find({
+    isActive: true,
+    nextCheckAt: { $lte: new Date() }
+  }).sort({ nextCheckAt: 1, name: 1 });
+}
+
 module.exports = {
   createIngredient,
   getAllIngredients,
   updateIngredient,
   deleteIngredient,
-  getLowStockIngredients
+  getLowStockIngredients,
+  getIngredientReminders
 };

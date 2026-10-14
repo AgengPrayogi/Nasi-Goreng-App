@@ -46,7 +46,11 @@ describe('Invoice API', () => {
   beforeAll(async () => {
     const adminRes = await request(app)
       .post('/api/auth/register-admin')
-      .send({ email: 'admin@example.com', password: testPassword })
+      .send({
+        email: 'admin@example.com',
+        password: testPassword,
+        confirmPassword: testPassword
+      })
       .expect(201);
 
     const admin = await require('../src/models/Admin').findOne({ email: 'admin@example.com' });

@@ -25,7 +25,7 @@ const StaffSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['admin', 'manager', 'cashier', 'chef', 'waiter'],
+      enum: ['admin', 'manager', 'pic', 'cashier', 'chef', 'waiter'],
       default: 'waiter',
       required: true
     },
@@ -59,7 +59,6 @@ const StaffSchema = new mongoose.Schema(
 );
 
 // Indexes for common queries
-StaffSchema.index({ email: 1 });
 StaffSchema.index({ role: 1, status: 1 });
 StaffSchema.index({ status: 1 });
 StaffSchema.index({ lastLoginAt: -1 });

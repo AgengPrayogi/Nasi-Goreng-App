@@ -61,7 +61,7 @@ export default function PaymentPage() {
   const handlePay = async (e) => {
     e.preventDefault()
     if (!order) return
-    const amount = order.totalAmount
+    const amount = order.amountAfterDiscount || order.totalAmount
     try {
       await createPaymentMutation.mutateAsync({
         orderId: order._id,

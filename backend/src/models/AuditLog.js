@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const AuditLogSchema = new mongoose.Schema({
   adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
   adminName: { type: String, required: true, trim: true },
-  action: { type: String, enum: ['create','update','delete','confirm','cancel','complete','payment','kitchen','login','logout','bulk_action','stock_movement','menu_change','ingredient_change','finance_change','other'], required: true },
+  action: { type: String, enum: ['create','update','delete','confirm','cancel','complete','payment','kitchen','login','logout','bulk_action','stock_movement','menu_change','ingredient_change','finance_change','close_day','finalize_day','other'], required: true },
   resource: { type: String, required: true, trim: true },
   resourceId: { type: mongoose.Schema.Types.ObjectId, required: false },
   description: { type: String, required: true, trim: true },

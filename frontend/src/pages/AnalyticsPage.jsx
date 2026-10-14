@@ -296,7 +296,7 @@ function AnalyticsPage() {
                   <tr key={item._id}>
                     <td><strong>{item.name}</strong></td>
                     <td style={{ fontWeight: 'bold', color: 'var(--red)' }}>{item.currentStock}</td>
-                    <td>{item.minStock}</td>
+                    <td>{item.minimumStock ?? item.minStock}</td>
                     <td>{item.unit}</td>
                     <td>
                       <span className="badge badge-red">

@@ -15,8 +15,16 @@ async function connectDB() {
   }
 
   mongoose.set('strictQuery', true);
+  mongoose.set('bufferCommands', false);
 
-  await mongoose.connect(uri);
+  await mongoose.connect(uri, {
+    serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS) || 10000,
+    connectTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS) || 10000,
+    socketTimeoutMS: Number(process.env.MONGO_SOCKET_TIMEOUT_MS) || 45000,
+    bufferCommands: false,
+    autoIndex: process.env.NODE_ENV !== 'test',
+    autoCreate: process.env.NODE_ENV !== 'test'
+  });
 
   return mongoose.connection;
 }

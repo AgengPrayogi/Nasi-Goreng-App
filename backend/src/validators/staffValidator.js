@@ -24,10 +24,10 @@ const createStaffSchema = Joi.object({
     'string.base': 'Phone must be a string'
   }),
   role: Joi.string()
-    .valid('admin', 'manager', 'cashier', 'chef', 'waiter')
+    .valid('admin', 'manager', 'pic', 'cashier', 'chef', 'waiter')
     .default('waiter')
     .messages({
-      'any.only': 'Role must be one of: admin, manager, cashier, chef, waiter'
+      'any.only': 'Role must be one of: admin, manager, pic, cashier, chef, waiter'
     }),
   notes: Joi.string().optional().allow('').messages({
     'string.base': 'Notes must be a string'
@@ -43,10 +43,10 @@ const updateStaffSchema = Joi.object({
     'string.base': 'Phone must be a string'
   }),
   role: Joi.string()
-    .valid('admin', 'manager', 'cashier', 'chef', 'waiter')
+    .valid('admin', 'manager', 'pic', 'cashier', 'chef', 'waiter')
     .optional()
     .messages({
-      'any.only': 'Role must be one of: admin, manager, cashier, chef, waiter'
+      'any.only': 'Role must be one of: admin, manager, pic, cashier, chef, waiter'
     }),
   status: Joi.string()
     .valid('active', 'inactive', 'suspended')

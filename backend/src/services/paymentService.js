@@ -19,6 +19,11 @@ async function createPayment({ orderId, method, amount, minutesToExpire = 1440 }
     throw new BusinessError('Cannot create payment for completed or cancelled order', 'INVALID_ORDER_STATUS');
   }
 
+  const expectedAmount = Number(order.amountAfterDiscount ?? order.totalAmount ?? 0);
+  if (Number(amount) !== expectedAmount) {
+    throw new BusinessError('Payment amount must match the order total', 'PAYMENT_AMOUNT_MISMATCH');
+  }
+
   const existing = await Payment.findOne({ order: orderId });
   if (existing) {
     throw new BusinessError('Payment already exists for this order', 'PAYMENT_ALREADY_EXISTS');

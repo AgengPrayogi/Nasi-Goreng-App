@@ -17,9 +17,17 @@ const CampaignSchema = new mongoose.Schema({
   endDate: { type: Date, required: true },
   targetSegment: {
     customerTiers: [{ type: String, enum: ['bronze', 'silver', 'gold'] }],
+    audienceSegments: [{ type: String, enum: ['individual', 'family', 'organization'] }],
     minOrders: { type: Number, default: 0 },
     minSpent: { type: Number, default: 0 },
     customFilter: { type: mongoose.Schema.Types.Mixed, default: {} }
+  },
+  automation: {
+    enabled: { type: Boolean, default: false },
+    trigger: { type: String, enum: ['segment_entry', 'at_risk', 'birthday', 'inactivity'], default: 'segment_entry' },
+    inactivityDays: { type: Number, default: 60, min: 1 },
+    lastEvaluatedAt: { type: Date },
+    lastMatchedCount: { type: Number, default: 0, min: 0 }
   },
   discountConfig: {
     type: { type: String, enum: ['percentage', 'fixed', 'buy_x_get_y'], default: 'percentage' },
@@ -36,6 +44,9 @@ const CampaignSchema = new mongoose.Schema({
     revenueGenerated: { type: Number, default: 0 },
     costIncurred: { type: Number, default: 0 },
     newCustomersAcquired: { type: Number, default: 0 }
+    , attributedOrders: { type: Number, default: 0, min: 0 }
+    , attributedDiscount: { type: Number, default: 0, min: 0 }
+    , attributedRevenue: { type: Number, default: 0, min: 0 }
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true }
 }, { timestamps: true });

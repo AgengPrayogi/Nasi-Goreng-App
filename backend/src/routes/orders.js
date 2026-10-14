@@ -7,6 +7,7 @@ const {
   listOrdersHandler,
   listKitchenQueueHandler,
   getOrderHandler,
+  updateOrderHandler,
   trackOrderHandler,
   updateKitchenStatusHandler,
   updatePaymentHandler
@@ -14,6 +15,7 @@ const {
 const { validate } = require('../middlewares/validation');
 const {
   createOrderSchema,
+  updateOrderSchema,
   trackOrderParamsSchema,
   kitchenStatusBodySchema,
   paymentUpdateBodySchema,
@@ -37,6 +39,7 @@ router.get('/queue', validate(queueQuerySchema, 'query'), listKitchenQueueHandle
 router.get('/', validate(listOrdersQuerySchema, 'query'), listOrdersHandler);
 
 router.patch('/:id/kitchen', validate(kitchenStatusBodySchema), updateKitchenStatusHandler);
+router.patch('/:id', validate(updateOrderSchema), updateOrderHandler);
 router.patch('/:id/payment', validate(paymentUpdateBodySchema), updatePaymentHandler);
 router.patch('/:id/confirm', confirmOrderHandler);
 router.patch('/:id/complete', completeOrderHandler);

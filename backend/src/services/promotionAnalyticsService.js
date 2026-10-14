@@ -53,8 +53,18 @@ async function getPromotionPerformance(promotionId) {
 
 async function getCampaignPerformance() {
   const campaigns = await Campaign.find().sort({ startDate: -1 }).limit(50).lean();
+  const attributed = await Order.aggregate([
+    { $match: { campaignId: { $in: campaigns.map((campaign) => campaign._id) }, status: 'completed' } },
+    { $group: { _id: '$campaignId', orders: { $sum: 1 }, revenue: { $sum: '$amountAfterDiscount' }, discount: { $sum: '$discountAmount' }, segments: { $push: '$promoAudienceSegment' } } }
+  ]);
+  const attributionMap = new Map(attributed.map((row) => [String(row._id), row]));
 
   return campaigns.map((c) => {
+    const attribution = attributionMap.get(String(c._id)) || { orders: 0, revenue: 0, discount: 0, segments: [] };
+    const segmentCounts = attribution.segments.reduce((counts, segment) => {
+      if (segment) counts[segment] = (counts[segment] || 0) + 1;
+      return counts;
+    }, {});
     const roi = c.metrics.costIncurred > 0
       ? Math.round(((c.metrics.revenueGenerated - c.metrics.costIncurred) / c.metrics.costIncurred) * 10000) / 100
       : 0;
@@ -68,6 +78,7 @@ async function getCampaignPerformance() {
       type: c.type,
       status: c.status,
       period: { startDate: c.startDate, endDate: c.endDate },
+      attribution: { orders: attribution.orders, revenue: attribution.revenue, discount: attribution.discount, segments: segmentCounts },
       metrics: { ...c.metrics, roi, conversionRate },
       budget: c.budget,
       budgetUsed: c.metrics.costIncurred,

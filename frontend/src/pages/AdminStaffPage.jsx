@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 import './AdminStaffPage.css';
 
 const AdminStaffPage = () => {
@@ -26,7 +26,7 @@ const AdminStaffPage = () => {
     notes: ''
   });
 
-  const token = localStorage.getItem('adminToken');
+  const token = localStorage.getItem('jwt') || localStorage.getItem('adminToken');
 
   // Fetch staff list
   useEffect(() => {
@@ -41,8 +41,8 @@ const AdminStaffPage = () => {
       if (filters.status) params.append('status', filters.status);
       if (filters.search) params.append('search', filters.search);
 
-      const response = await axios.get(
-        `http://localhost:5000/api/staff?${params}`,
+      const response = await api.get(
+        `/staff?${params}`,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }
@@ -67,12 +67,12 @@ const AdminStaffPage = () => {
         formData;
 
       const url = editingId 
-        ? `http://localhost:5000/api/staff/${editingId}`
-        : 'http://localhost:5000/api/staff';
+        ? `/staff/${editingId}`
+        : '/staff';
 
       const method = editingId ? 'patch' : 'post';
 
-      const response = await axios[method](url, payload, {
+      const response = await api[method](url, payload, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -94,7 +94,7 @@ const AdminStaffPage = () => {
   const handleDeleteStaff = async (staffId) => {
     if (window.confirm('Hapus staff ini? Mereka tidak akan bisa login lagi.')) {
       try {
-        await axios.delete(`http://localhost:5000/api/staff/${staffId}`, {
+        await api.delete(`/staff/${staffId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         setStaffList(staffList.filter(s => s._id !== staffId));
@@ -111,8 +111,8 @@ const AdminStaffPage = () => {
       from.setDate(from.getDate() - 30);
       const to = new Date();
 
-      const response = await axios.get(
-        `http://localhost:5000/api/staff/${staffId}/performance?from=${from.toISOString().split('T')[0]}&to=${to.toISOString().split('T')[0]}`,
+      const response = await api.get(
+        `/staff/${staffId}/performance?from=${from.toISOString().split('T')[0]}&to=${to.toISOString().split('T')[0]}`,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }

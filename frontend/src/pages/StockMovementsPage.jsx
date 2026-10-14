@@ -50,6 +50,8 @@ export default function StockMovementsPage() {
   const selectedIngredientRestock = ingredients.find((i) => i._id === restockForm.ingredientId)
   const selectedIngredientAdj = ingredients.find((i) => i._id === adjForm.ingredientId)
 
+  const getStock = (item) => item?.currentStock ?? item?.stock ?? 0
+  const getMinStock = (item) => item?.minimumStock ?? item?.minStock ?? 0
   const fmt = (v) => v != null ? Number(v).toLocaleString('id-ID') : '-'
 
   /* ── Page header ─────────────────────────── */
@@ -102,7 +104,7 @@ export default function StockMovementsPage() {
                 <label>Ingredient</label>
                 <select value={restockForm.ingredientId} onChange={(e) => setRestockForm({ ...restockForm, ingredientId: e.target.value })} required>
                   <option value="">Select ingredient…</option>
-                  {ingredients.map((i) => <option key={i._id} value={i._id}>{i.name} (stok: {fmt(i.stock)} {i.unit})</option>)}
+                  {ingredients.map((i) => <option key={i._id} value={i._id}>{i.name} (stok: {fmt(getStock(i))} {i.unit})</option>)}
                 </select>
               </div>
               <div className="form-group">
@@ -118,7 +120,7 @@ export default function StockMovementsPage() {
               <div className="card card-accent-green" style={{ marginBottom: '1rem', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>📊</span>
                 <span style={{ fontSize: '0.9rem' }}>
-                  Stok setelah restock: <strong>{fmt(selectedIngredientRestock.stock + Number(restockForm.quantity || 0))} {selectedIngredientRestock.unit}</strong>
+                  Stok setelah restock: <strong>{fmt(getStock(selectedIngredientRestock) + Number(restockForm.quantity || 0))} {selectedIngredientRestock.unit}</strong>
                 </span>
               </div>
             )}
@@ -139,7 +141,7 @@ export default function StockMovementsPage() {
                 <label>Ingredient</label>
                 <select value={adjForm.ingredientId} onChange={(e) => setAdjForm({ ...adjForm, ingredientId: e.target.value })} required>
                   <option value="">Select ingredient…</option>
-                  {ingredients.map((i) => <option key={i._id} value={i._id}>{i.name} (stok: {fmt(i.stock)} {i.unit})</option>)}
+                  {ingredients.map((i) => <option key={i._id} value={i._id}>{i.name} (stok: {fmt(getStock(i))} {i.unit})</option>)}
                 </select>
               </div>
               <div className="form-group">
@@ -159,7 +161,7 @@ export default function StockMovementsPage() {
               <div className={`card ${Number(adjForm.quantity || 0) < 0 ? 'card-accent-red' : 'card-accent-green'}`} style={{ marginBottom: '1rem', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span>📊</span>
                 <span style={{ fontSize: '0.9rem' }}>
-                  Stok setelah adjustment: <strong>{fmt(selectedIngredientAdj.stock + Number(adjForm.quantity || 0))} {selectedIngredientAdj.unit}</strong>
+                  Stok setelah adjustment: <strong>{fmt(getStock(selectedIngredientAdj) + Number(adjForm.quantity || 0))} {selectedIngredientAdj.unit}</strong>
                 </span>
               </div>
             )}
@@ -192,7 +194,9 @@ export default function StockMovementsPage() {
               </thead>
               <tbody>
                 {ingredients.map((item) => {
-                  const isLow = item.stock <= item.minStock
+                  const currentStock = getStock(item)
+                  const minimumStock = getMinStock(item)
+                  const isLow = currentStock <= minimumStock
                   return (
                     <tr key={item._id} style={{ background: isLow ? '#fff3e0' : 'transparent' }}>
                       <td>
@@ -202,12 +206,12 @@ export default function StockMovementsPage() {
                         </div>
                       </td>
                       <td>{item.unit}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 'bold', color: isLow ? 'var(--red)' : 'inherit' }}>{fmt(item.stock)}</td>
-                      <td style={{ textAlign: 'right' }}>{fmt(item.minStock)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 'bold', color: isLow ? 'var(--red)' : 'inherit' }}>{fmt(currentStock)}</td>
+                      <td style={{ textAlign: 'right' }}>{fmt(minimumStock)}</td>
                       <td style={{ textAlign: 'center' }}>
                         {isLow
                           ? <span className="badge badge-red">
-                              {item.stock === 0 ? 'Out of Stock' : 'Low Stock'}
+                              {currentStock === 0 ? 'Out of Stock' : 'Low Stock'}
                             </span>
                           : <span className="badge badge-green">OK</span>}
                       </td>

@@ -44,7 +44,9 @@ async function createStaff(data, createdByAdminId, createdByAdminName, ipAddress
     ipAddress
   );
 
-  return staff.toObject();
+  const safeStaff = staff.toObject();
+  delete safeStaff.passwordHash;
+  return safeStaff;
 }
 
 /**

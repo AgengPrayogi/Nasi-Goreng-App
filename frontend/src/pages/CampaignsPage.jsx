@@ -100,14 +100,15 @@ function CampaignsPage() {
       <div className="card">
         <h3>Campaign Performance</h3>
         <table className="table">
-          <thead><tr><th>Nama</th><th>Status</th><th>Redemptions</th><th>Revenue</th><th>Cost</th><th>ROI</th><th>Conversion</th></tr></thead>
+          <thead><tr><th>Nama</th><th>Status</th><th>Attributed Orders</th><th>Revenue</th><th>Discount</th><th>Segments</th><th>ROI</th></tr></thead>
           <tbody>
             {performance.map((c) => (
               <tr key={c.campaignId}>
                 <td>{c.name}</td><td>{c.status}</td>
-                <td>{c.metrics.redemptions}</td><td>{fmt(c.metrics.revenueGenerated)}</td>
-                <td>{fmt(c.metrics.costIncurred)}</td>
-                <td>{c.metrics.roi}%</td><td>{c.metrics.conversionRate}%</td>
+                <td>{c.attribution?.orders || 0}</td><td>{fmt(c.attribution?.revenue)}</td>
+                <td>{fmt(c.attribution?.discount)}</td>
+                <td>{Object.entries(c.attribution?.segments || {}).map(([segment, count]) => `${segment}: ${count}`).join(', ') || '-'}</td>
+                <td>{c.metrics.roi}%</td>
               </tr>
             ))}
             {performance.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--gray-500)' }}>Belum ada campaign</td></tr>}

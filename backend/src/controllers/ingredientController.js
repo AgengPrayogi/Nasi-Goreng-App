@@ -3,7 +3,8 @@ const {
   getAllIngredients,
   updateIngredient,
   deleteIngredient,
-  getLowStockIngredients
+  getLowStockIngredients,
+  getIngredientReminders
 } = require('../services/ingredientService');
 const Ingredient = require('../models/Ingredient');
 const { NotFoundError } = require('../errors/AppError');
@@ -69,11 +70,21 @@ async function getLowStockIngredientsHandler(req, res, next) {
   }
 }
 
+async function getIngredientRemindersHandler(req, res, next) {
+  try {
+    const ingredients = await getIngredientReminders();
+    res.json({ data: ingredients });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   createIngredientHandler,
   getAllIngredientsHandler,
-    getIngredientByIdHandler,
+  getIngredientByIdHandler,
   updateIngredientHandler,
   deleteIngredientHandler,
-  getLowStockIngredientsHandler
+  getLowStockIngredientsHandler,
+  getIngredientRemindersHandler
 };

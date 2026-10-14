@@ -3,10 +3,19 @@ const mongoose = require('mongoose');
 
 const Menu = require('../models/Menu');
 const Order = require('../models/Order');
+const QueueSequence = require('../models/QueueSequence');
+const Campaign = require('../models/Campaign');
+const Table = require('../models/Table');
 const Ingredient = require('../models/Ingredient');
 const StockMovement = require('../models/StockMovement');
+const { attachOrderToCustomer, recordCompletedOrder } = require('./customerService');
 const { AppError, BusinessError, NotFoundError } = require('../errors/AppError');
 const { getQueueBusinessDate, getEtaMinutes } = require('../config/orderFlow');
+const { calculateDiscount, recordPromoCodeUsage } = require('./promotionService');
+const { assertWalkInTableAvailable } = require('./reservationService');
+const { createTransactionIfMissing } = require('./financeService');
+const { recordCustomerConsent } = require('./whatsappConsentService');
+const { enqueueWhatsAppEvent } = require('./whatsappEventService');
 
 function buildOrderCode() {
   const d = new Date();
@@ -20,6 +29,32 @@ function totalItemQuantity(order) {
   return order.items.reduce((sum, it) => sum + Number(it.quantity || 0), 0);
 }
 
+async function allocateQueueNumber(queueDate) {
+  // Seed from existing orders on first use so this remains safe during rollout.
+  const current = await QueueSequence.findOneAndUpdate(
+    { queueDate },
+    { $inc: { value: 1 } },
+    { new: true }
+  );
+  if (current) return current.value;
+
+  const existing = await Order.findOne({ queueDate }).sort({ queueNumber: -1 }).select('queueNumber').lean();
+  const initialValue = Number(existing?.queueNumber || 0) + 1;
+  try {
+    const seeded = await QueueSequence.create({ queueDate, value: initialValue });
+    return seeded.value;
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    // A concurrent first confirmer won the insert. Increment its sequence.
+    const incremented = await QueueSequence.findOneAndUpdate(
+      { queueDate },
+      { $inc: { value: 1 } },
+      { new: true }
+    );
+    return incremented.value;
+  }
+}
+
 /**
  * Create a new order (walk-in or online).
  */
@@ -29,7 +64,14 @@ async function createOrder(data) {
     notes = '',
     channel = 'dine_in',
     customerName = '',
-    customerPhone = ''
+    customerPhone = '',
+    promoCodeUsed = '',
+    campaignId = '',
+    fulfillmentType = 'takeaway',
+    tableId = '',
+    deliveryAddress = '',
+    deliveryNotes = '',
+    whatsappConsent = {}
   } = data;
 
   const name = String(customerName || '').trim();
@@ -37,9 +79,14 @@ async function createOrder(data) {
   if (!name) {
     throw new BusinessError('Customer name is required', 'CUSTOMER_NAME_REQUIRED');
   }
-  if (!phone) {
-    throw new BusinessError('Customer phone is required', 'CUSTOMER_PHONE_REQUIRED');
+  if (!phone && (whatsappConsent.utility === true || whatsappConsent.marketing === true)) {
+    throw new BusinessError('A phone number is required for WhatsApp consent', 'PHONE_REQUIRED_FOR_WHATSAPP_CONSENT');
   }
+  if (fulfillmentType === 'delivery' && !String(deliveryAddress || '').trim()) {
+    throw new BusinessError('Delivery address is required', 'DELIVERY_ADDRESS_REQUIRED');
+  }
+
+  let table;
 
   const orderItems = [];
   let totalAmount = 0;
@@ -67,12 +114,32 @@ async function createOrder(data) {
     });
   }
 
+  const discount = promoCodeUsed
+    ? await calculateDiscount(promoCodeUsed, totalAmount, orderItems)
+    : { discountAmount: 0, discountPercentage: 0, finalAmount: totalAmount };
+
+  if (fulfillmentType === 'dine_in') {
+    if (!tableId) throw new BusinessError('Table is required for dine-in orders', 'TABLE_REQUIRED');
+    await assertWalkInTableAvailable(tableId);
+    table = await Table.findOneAndUpdate(
+      { _id: tableId, isActive: true, status: 'available' },
+      { status: 'occupied' },
+      { new: true }
+    );
+    if (!table) throw new BusinessError('Selected table is unavailable', 'TABLE_UNAVAILABLE');
+  }
+
   const maxAttempts = 8;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const orderCode = buildOrderCode();
     const order = new Order({
       orderCode,
       channel,
+      fulfillmentType,
+      tableId: table?._id,
+      tableNumber: table?.number || '',
+      deliveryAddress: String(deliveryAddress || '').trim(),
+      deliveryNotes: String(deliveryNotes || '').trim(),
       customerName: String(customerName || '').trim(),
       customerPhone: String(customerPhone || '').trim(),
       items: orderItems,
@@ -81,11 +148,34 @@ async function createOrder(data) {
       notes: typeof notes === 'string' ? notes : '',
       kitchenStatus: 'none',
       paymentStatus: 'unpaid',
+      promoCodeUsed: typeof promoCodeUsed === 'string' ? promoCodeUsed.trim() : '',
+      campaignId: campaignId || undefined,
+      discountAmount: discount.discountAmount,
+      discountPercentage: Number(discount.discountPercentage),
+      amountAfterDiscount: discount.finalAmount,
       queueNumber: 0,
       queueDate: ''
     });
 
     try {
+      await order.save();
+      if (phone) {
+        const customer = await attachOrderToCustomer({ phone, name, orderId: order._id });
+        order.customerId = customer._id;
+        order.promoAudienceSegment = customer.audienceSegment;
+        if (whatsappConsent.utility === true || whatsappConsent.marketing === true) {
+          await recordCustomerConsent({
+            customerId: customer._id,
+            consent: whatsappConsent,
+            source: 'order_checkout',
+            textVersion: process.env.WHATSAPP_CONSENT_TEXT_VERSION || 'wa-consent-v1'
+          });
+        }
+      }
+      if (table) {
+        table.activeOrderId = order._id;
+        await table.save();
+      }
       await order.save();
       return order;
     } catch (err) {
@@ -185,7 +275,7 @@ async function getOrderById(orderId) {
 }
 
 const PUBLIC_ORDER_SELECT =
-  'orderCode status totalAmount notes createdAt updatedAt items channel customerName customerPhone queueDate queueNumber kitchenStatus estimatedReadyAt readyAt paymentStatus paymentMethod externalPaymentId paymentReference';
+  'orderCode status totalAmount amountAfterDiscount discountAmount notes createdAt updatedAt items channel fulfillmentType customerName customerPhone queueDate queueNumber kitchenStatus estimatedReadyAt readyAt paymentStatus paymentMethod externalPaymentId paymentReference';
 
 async function getOrderPublicByCode(orderCode) {
   const code = String(orderCode || '').trim().toUpperCase();
@@ -202,6 +292,77 @@ async function getOrderPublicByCode(orderCode) {
   }
 
   return order;
+}
+
+async function updateOrder(orderId, payload) {
+  const order = await Order.findById(orderId);
+  if (!order) throw new NotFoundError('Order');
+
+  const canEdit = order.status === 'pending' ||
+    (order.status === 'confirmed' && order.kitchenStatus === 'queued');
+  if (!canEdit) {
+    throw new BusinessError('Order can only be edited before kitchen preparation starts', 'ORDER_NOT_EDITABLE');
+  }
+
+  const updates = {};
+  if (Object.hasOwn(payload, 'items')) {
+    if (order.paymentStatus === 'paid') {
+      throw new BusinessError('Paid order items cannot be changed', 'PAID_ORDER_ITEMS_LOCKED');
+    }
+
+    const items = [];
+    let totalAmount = 0;
+    for (const item of payload.items) {
+      const menu = await Menu.findById(item.menuId);
+      if (!menu) throw new NotFoundError(`Menu with id ${item.menuId}`);
+      if (!menu.isAvailable) {
+        throw new BusinessError(`Menu "${menu.name}" is not available`, 'MENU_UNAVAILABLE');
+      }
+      items.push({ menu: menu._id, quantity: item.quantity, priceAtOrder: menu.price });
+      totalAmount += menu.price * item.quantity;
+    }
+
+    const discount = order.promoCodeUsed
+      ? await calculateDiscount(order.promoCodeUsed, totalAmount, items)
+      : { discountAmount: 0, discountPercentage: 0, finalAmount: totalAmount };
+
+    updates.items = items;
+    updates.totalAmount = totalAmount;
+    updates.discountAmount = discount.discountAmount;
+    updates.discountPercentage = Number(discount.discountPercentage);
+    updates.amountAfterDiscount = discount.finalAmount;
+
+    if (order.status === 'confirmed' && order.kitchenStatus === 'queued') {
+      const aheadCount = await Order.countDocuments({
+        queueDate: order.queueDate,
+        status: 'confirmed',
+        kitchenStatus: { $in: ['queued', 'preparing'] },
+        queueNumber: { $lt: order.queueNumber }
+      });
+      const estimatedMinutes = getEtaMinutes({
+        totalItemQty: items.reduce((sum, item) => sum + item.quantity, 0),
+        aheadCount
+      });
+      updates.estimatedReadyAt = new Date(Date.now() + estimatedMinutes * 60000);
+    }
+  }
+  if (Object.hasOwn(payload, 'notes')) updates.notes = payload.notes;
+
+  const updatedOrder = await Order.findOneAndUpdate(
+    {
+      _id: order._id,
+      status: order.status,
+      kitchenStatus: order.kitchenStatus,
+      paymentStatus: order.paymentStatus
+    },
+    { $set: updates },
+    { new: true, runValidators: true }
+  );
+
+  if (!updatedOrder) {
+    throw new BusinessError('Order changed while being edited; reload and try again', 'ORDER_CHANGED');
+  }
+  return updatedOrder;
 }
 
 async function confirmOrder(orderId) {
@@ -222,11 +383,7 @@ async function confirmOrder(orderId) {
   }
 
   const queueDate = getQueueBusinessDate();
-  const agg = await Order.aggregate([
-    { $match: { queueDate, queueNumber: { $gte: 1 } } },
-    { $group: { _id: null, maxNum: { $max: '$queueNumber' } } }
-  ]);
-  const nextQueueNumber = (agg[0] && agg[0].maxNum ? agg[0].maxNum : 0) + 1;
+  const nextQueueNumber = await allocateQueueNumber(queueDate);
 
   const aheadCount = await Order.countDocuments({
     queueDate,
@@ -247,13 +404,23 @@ async function confirmOrder(orderId) {
   order.readyAt = undefined;
 
   await order.save();
+  await enqueueWhatsAppEvent({
+    customerId: order.customerId,
+    templateKey: 'order_confirmed',
+    variables: { customer_name: order.customerName || 'Pelanggan', order_code: order.orderCode },
+    source: 'order.confirmed',
+    sourceId: String(order._id)
+  });
   return order;
 }
 
-const KITCHEN_STATES = ['queued', 'preparing', 'ready', 'served'];
+const KITCHEN_TRANSITIONS = {
+  queued: 'preparing',
+  preparing: 'ready'
+};
 
 async function updateKitchenStatus(orderId, nextStatus) {
-  if (!KITCHEN_STATES.includes(nextStatus)) {
+  if (!Object.values(KITCHEN_TRANSITIONS).includes(nextStatus)) {
     throw new BusinessError('Invalid kitchen status', 'INVALID_KITCHEN_STATUS');
   }
 
@@ -266,17 +433,36 @@ async function updateKitchenStatus(orderId, nextStatus) {
     throw new BusinessError('Kitchen updates only apply to confirmed orders', 'INVALID_ORDER_STATUS');
   }
 
-  if (order.kitchenStatus === 'none') {
-    throw new BusinessError('Order must be confirmed (queued) before kitchen updates', 'KITCHEN_NOT_QUEUED');
+  if (KITCHEN_TRANSITIONS[order.kitchenStatus] !== nextStatus) {
+    throw new BusinessError(
+      `Kitchen status can only advance from ${order.kitchenStatus} to ${KITCHEN_TRANSITIONS[order.kitchenStatus] || 'completed'}`,
+      'INVALID_KITCHEN_TRANSITION'
+    );
   }
 
-  order.kitchenStatus = nextStatus;
-  if (nextStatus === 'ready' && !order.readyAt) {
-    order.readyAt = new Date();
+  const updates = { kitchenStatus: nextStatus };
+  if (nextStatus === 'ready') {
+    updates.readyAt = new Date();
   }
 
-  await order.save();
-  return order;
+  const updatedOrder = await Order.findOneAndUpdate(
+    { _id: order._id, status: 'confirmed', kitchenStatus: order.kitchenStatus },
+    { $set: updates },
+    { new: true, runValidators: true }
+  );
+  if (!updatedOrder) {
+    throw new BusinessError('Order status changed; reload the kitchen queue and try again', 'ORDER_CHANGED');
+  }
+  if (nextStatus === 'ready') {
+    await enqueueWhatsAppEvent({
+      customerId: updatedOrder.customerId,
+      templateKey: 'order_ready',
+      variables: { customer_name: updatedOrder.customerName || 'Pelanggan', order_code: updatedOrder.orderCode },
+      source: 'order.ready',
+      sourceId: String(updatedOrder._id)
+    });
+  }
+  return updatedOrder;
 }
 
 async function updatePayment(orderId, payload) {
@@ -352,6 +538,7 @@ function requirePaidBeforeComplete() {
 
 async function completeOrder(orderId) {
   const session = await mongoose.startSession();
+  let feedbackToken;
 
   try {
     session.startTransaction();
@@ -359,11 +546,30 @@ async function completeOrder(orderId) {
     const order = await Order.findById(orderId).session(session);
     if (!order) throw new NotFoundError('Order');
 
+    if (order.status === 'completed') {
+      await createTransactionIfMissing({
+        type: 'income',
+        amount: Number(order.amountAfterDiscount || order.totalAmount || 0),
+        description: `Order completed: ${order.orderCode}`,
+        category: 'order_payment',
+        reference: `ORDER-${order._id.toString()}`,
+        date: order.updatedAt || new Date(),
+        relatedOrder: order._id,
+        createdBy: order.completedBy || undefined
+      });
+      await session.commitTransaction();
+      return order;
+    }
+
     if (order.status !== 'confirmed') {
       throw new BusinessError(
         'Order must be confirmed before it can be completed',
         'INVALID_ORDER_STATUS'
       );
+    }
+
+    if (order.kitchenStatus !== 'ready') {
+      throw new BusinessError('Order must be ready before it can be completed', 'ORDER_NOT_READY');
     }
 
     if (requirePaidBeforeComplete() && order.paymentStatus !== 'paid') {
@@ -423,11 +629,69 @@ async function completeOrder(orderId) {
       await StockMovement.insertMany(movements, { session });
     }
 
+    if (order.status === 'completed') {
+      await createTransactionIfMissing({
+        type: 'income',
+        amount: Number(order.amountAfterDiscount || order.totalAmount || 0),
+        description: `Order completed: ${order.orderCode}`,
+        category: 'order_payment',
+        reference: `ORDER-${order._id.toString()}`,
+        date: order.updatedAt || new Date(),
+        relatedOrder: order._id,
+        createdBy: order.completedBy || undefined
+      });
+      await session.commitTransaction();
+      return order;
+    }
+
     order.status = 'completed';
     order.kitchenStatus = 'served';
+    feedbackToken = crypto.randomBytes(32).toString('hex');
+    order.feedbackTokenHash = crypto.createHash('sha256').update(feedbackToken).digest('hex');
     await order.save({ session });
+    if (order.customerId) await recordCompletedOrder(order, session);
+    if (order.promoCodeUsed) await recordPromoCodeUsage(order.promoCodeUsed);
+    await createTransactionIfMissing({
+      type: 'income',
+      amount: Number(order.amountAfterDiscount || order.totalAmount || 0),
+      description: `Order completed: ${order.orderCode}`,
+      category: 'order_payment',
+      reference: `ORDER-${order._id.toString()}`,
+      date: new Date(),
+      relatedOrder: order._id,
+      createdBy: order.completedBy || undefined
+    });
+    if (order.tableId) {
+      await Table.findOneAndUpdate(
+        { _id: order.tableId, activeOrderId: order._id },
+        { status: 'cleaning', $unset: { activeOrderId: 1 } },
+        { session }
+      );
+    }
+    if (order.campaignId) {
+      await Campaign.findByIdAndUpdate(order.campaignId, {
+        $inc: {
+          'metrics.redemptions': 1,
+          'metrics.revenueGenerated': Number(order.amountAfterDiscount || order.totalAmount || 0),
+          'metrics.attributedOrders': 1,
+          'metrics.attributedDiscount': Number(order.discountAmount || 0),
+          'metrics.attributedRevenue': Number(order.amountAfterDiscount || order.totalAmount || 0)
+        }
+      }, { session });
+    }
 
     await session.commitTransaction();
+    await enqueueWhatsAppEvent({
+      customerId: order.customerId,
+      templateKey: 'feedback_request',
+      variables: {
+        customer_name: order.customerName || 'Pelanggan',
+        order_code: order.orderCode,
+        feedback_url: `${(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '')}/feedback/${encodeURIComponent(order.orderCode)}?token=${encodeURIComponent(feedbackToken)}`
+      },
+      source: 'order.completed.feedback',
+      sourceId: String(order._id)
+    });
     return order;
   } catch (err) {
     await session.abortTransaction();
@@ -460,6 +724,14 @@ async function cancelOrder(orderId) {
 
   order.status = 'cancelled';
   await order.save();
+  // A cancelled dine-in order must not leave the table looking occupied.
+  // Keep it in cleaning until staff explicitly makes it available again.
+  if (order.tableId) {
+    await Table.findOneAndUpdate(
+      { _id: order.tableId, activeOrderId: order._id },
+      { status: 'cleaning', $unset: { activeOrderId: 1 } }
+    );
+  }
   return order;
 }
 
@@ -472,6 +744,7 @@ module.exports = {
   listKitchenQueue,
   getOrderById,
   getOrderPublicByCode,
+  updateOrder,
   updateKitchenStatus,
   updatePayment,
   updatePaymentByOrderCode

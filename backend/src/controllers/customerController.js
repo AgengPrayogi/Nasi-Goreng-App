@@ -1,6 +1,9 @@
 const {
+  createCustomer,
   getCustomerById,
   getAllCustomers,
+  getCustomerTiers,
+  updateCustomerType,
   updateCustomer,
   getCustomerOrderHistory,
   getTopCustomers,
@@ -9,6 +12,34 @@ const {
   getChurnRiskCustomers,
   getCustomerLifetimeValue
 } = require('../services/customerService');
+const customerSupportService = require('../services/customerSupportService');
+
+async function createCustomerHandler(req, res, next) {
+  try {
+    const customer = await createCustomer(req.body);
+    res.status(201).json({ success: true, data: customer });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getCustomerTiersHandler(req, res, next) {
+  try {
+    const tiers = await getCustomerTiers();
+    res.json({ success: true, data: tiers });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateCustomerTypeHandler(req, res, next) {
+  try {
+    const customer = await updateCustomerType(req.params.id, req.body.customerType);
+    res.json({ success: true, data: customer, message: 'Customer type updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
 
 /**
  * Get all customers with filters
@@ -59,9 +90,9 @@ async function getCustomerHandler(req, res, next) {
 async function updateCustomerHandler(req, res, next) {
   try {
     const { id } = req.params;
-    const { name, email, address, notes } = req.body;
+    const { name, email, address, notes, audienceSegment, householdSize, organizationName } = req.body;
 
-    const customer = await updateCustomer(id, { name, email, address, notes });
+    const customer = await updateCustomer(id, { name, email, address, notes, audienceSegment, householdSize, organizationName });
 
     res.json({
       success: true,
@@ -71,6 +102,28 @@ async function updateCustomerHandler(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+async function getCrmDashboardHandler(req, res, next) {
+  try {
+    const data = await require('../services/customerService').getCrmDashboard();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+async function listSupportTicketsHandler(req, res, next) {
+  try { res.json({ success: true, data: await customerSupportService.listTickets(req.query) }); }
+  catch (err) { next(err); }
+}
+
+async function createSupportTicketHandler(req, res, next) {
+  try { res.status(201).json({ success: true, data: await customerSupportService.createTicket(req.body, req.user?.id) }); }
+  catch (err) { next(err); }
+}
+
+async function updateSupportTicketHandler(req, res, next) {
+  try { res.json({ success: true, data: await customerSupportService.updateTicket(req.params.ticketId, req.body) }); }
+  catch (err) { next(err); }
 }
 
 /**
@@ -189,6 +242,9 @@ async function getCustomerLifetimeValueHandler(req, res, next) {
 }
 
 module.exports = {
+  createCustomerHandler,
+  getCustomerTiersHandler,
+  updateCustomerTypeHandler,
   getAllCustomersHandler,
   getCustomerHandler,
   updateCustomerHandler,
@@ -197,5 +253,9 @@ module.exports = {
   getCustomerSegmentsHandler,
   getRepeatCustomerRateHandler,
   getChurnRiskHandler,
-  getCustomerLifetimeValueHandler
+  getCustomerLifetimeValueHandler,
+  getCrmDashboardHandler,
+  listSupportTicketsHandler,
+  createSupportTicketHandler,
+  updateSupportTicketHandler
 };

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
+const Staff = require('../models/Staff');
 const { AppError } = require('../errors/AppError');
 
 function getTokenFromHeader(req) {
@@ -32,14 +33,27 @@ async function authenticate(req, res, next) {
       throw new AppError('Invalid or expired token', 401, 'INVALID_TOKEN');
     }
 
-    const admin = await Admin.findById(payload.sub);
-    if (!admin || !admin.isActive) {
-      throw new AppError('Admin not found or inactive', 401, 'UNAUTHORIZED');
+    let userEntity;
+    let authType = 'admin';
+
+    if (payload.type === 'staff') {
+      authType = 'staff';
+      userEntity = await Staff.findById(payload.sub);
+      if (!userEntity || !userEntity.isActive || userEntity.status !== 'active') {
+        throw new AppError('Staff not found or inactive', 401, 'UNAUTHORIZED');
+      }
+    } else {
+      userEntity = await Admin.findById(payload.sub);
+      if (!userEntity || !userEntity.isActive) {
+        throw new AppError('Admin not found or inactive', 401, 'UNAUTHORIZED');
+      }
     }
 
     req.user = {
-      id: admin._id.toString(),
-      email: admin.email
+      id: userEntity._id.toString(),
+      email: userEntity.email,
+      role: payload.role || userEntity.role || 'admin',
+      type: authType
     };
 
     next();
@@ -48,15 +62,38 @@ async function authenticate(req, res, next) {
   }
 }
 
+function requireRole(allowedRoles = []) {
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  return (req, res, next) => {
+    if (!req.user) {
+      return next(new AppError('Authentication required', 403, 'FORBIDDEN'));
+    }
+
+    const userRole = req.user.role || 'admin';
+    if (!roles.includes(userRole)) {
+      return next(new AppError('Insufficient permissions for this action', 403, 'FORBIDDEN'));
+    }
+
+    return next();
+  };
+}
+
 function requireAdmin(req, res, next) {
   if (!req.user) {
+    return next(new AppError('Admin authentication required', 403, 'FORBIDDEN'));
+  }
+  if (req.user.role !== 'admin' && req.user.type !== 'admin') {
     return next(new AppError('Admin authentication required', 403, 'FORBIDDEN'));
   }
   return next();
 }
 
+const requirePIC = requireRole(['admin', 'manager', 'pic']);
+
 module.exports = {
   authenticate,
-  requireAdmin
+  requireAdmin,
+  requireRole,
+  requirePIC
 };
 

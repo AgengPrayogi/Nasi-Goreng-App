@@ -8,9 +8,11 @@ const AdminSchema = new mongoose.Schema(
     isVerified: { type: Boolean, default: false },
     verificationToken: { type: String, default: '' },
     verificationTokenExpiry: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
+    lastVerificationTokenHash: { type: String, default: '' },
     resetToken: { type: String, default: '' },
     resetTokenExpiry: { type: Date },
     passwordChangedAt: { type: Date },
+    authVersion: { type: Number, default: 0 },
     lastLoginAt: { type: Date },
     lastLoginIp: { type: String }
   },

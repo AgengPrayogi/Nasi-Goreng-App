@@ -47,6 +47,9 @@ async function authenticate(req, res, next) {
       if (!userEntity || !userEntity.isActive) {
         throw new AppError('Admin not found or inactive', 401, 'UNAUTHORIZED');
       }
+      if ((payload.authVersion || 0) !== (userEntity.authVersion || 0)) {
+        throw new AppError('Password changed; please log in again', 401, 'SESSION_REVOKED');
+      }
     }
 
     req.user = {

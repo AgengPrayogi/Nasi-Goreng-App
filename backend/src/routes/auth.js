@@ -7,7 +7,8 @@ const {
   refreshTokenHandler,
   forgotPasswordHandler,
   resetPasswordHandler,
-  changePasswordHandler
+  changePasswordHandler,
+  currentAdminHandler
 } = require('../controllers/authController');
 const { validate } = require('../middlewares/validation');
 const {
@@ -19,7 +20,7 @@ const {
   changePasswordSchema,
   refreshTokenSchema
 } = require('../validators/authValidator');
-const { authenticate } = require('../middlewares/auth');
+const { authenticate, requireAdmin } = require('../middlewares/auth');
 const {
   loginLimiter,
   registerLimiter,
@@ -32,6 +33,7 @@ const router = express.Router();
 // Public auth endpoints
 router.post('/register-admin', registerLimiter, validate(registerAdminSchema), registerAdminHandler);
 router.get('/verify-email/:token', verifyEmailHandler);
+router.post('/verify-email/:token', verifyEmailHandler);
 router.post('/resend-verification', resendEmailLimiter, validate(resendVerificationSchema), resendVerificationEmailHandler);
 router.post('/login', loginLimiter, validate(loginSchema), loginHandler);
 router.post('/refresh', validate(refreshTokenSchema), refreshTokenHandler);
@@ -40,5 +42,6 @@ router.post('/reset-password/:token', validate(resetPasswordSchema), resetPasswo
 
 // Protected endpoints (require authentication)
 router.patch('/change-password', authenticate, validate(changePasswordSchema), changePasswordHandler);
+router.get('/me', authenticate, requireAdmin, currentAdminHandler);
 
 module.exports = router;

@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import api from '../api.js'
 
 export default function AdminLogin() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [form, setForm] = useState({ email: '', password: '' })
   const [emailNotVerified, setEmailNotVerified] = useState(false)
 
@@ -58,6 +59,8 @@ export default function AdminLogin() {
           <p style={{ color: 'var(--gray-500)', fontSize: '0.9rem' }}>Nasi Goreng Polonia</p>
         </div>
 
+        {location.state?.message && <p role="status" style={{ color: '#43a047', marginBottom: '1rem' }}>{location.state.message}</p>}
+
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Email</label>
@@ -105,6 +108,7 @@ export default function AdminLogin() {
 
         <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between' }}>
           <Link to="/admin/register" style={{ color: 'var(--yellow)', fontSize: '0.85rem' }}>Buat Akun Baru</Link>
+          <Link to="/admin/forgot-password" style={{ color: 'var(--yellow)', fontSize: '0.85rem' }}>Lupa password?</Link>
           <Link to="/" style={{ color: 'var(--gray-500)', fontSize: '0.85rem' }}>Beranda</Link>
         </div>
       </div>

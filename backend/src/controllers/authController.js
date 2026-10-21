@@ -133,6 +133,10 @@ async function changePasswordHandler(req, res, next) {
   }
 }
 
+async function currentAdminHandler(req, res) {
+  res.json({ data: { id: req.user.id, email: req.user.email, role: req.user.role, type: req.user.type } });
+}
+
 module.exports = {
   registerAdminHandler,
   verifyEmailHandler,
@@ -141,5 +145,6 @@ module.exports = {
   refreshTokenHandler,
   forgotPasswordHandler,
   resetPasswordHandler,
-  changePasswordHandler
+  changePasswordHandler,
+  currentAdminHandler
 };

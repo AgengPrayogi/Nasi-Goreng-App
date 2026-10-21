@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import api from '../api.js'
@@ -6,11 +6,11 @@ import api from '../api.js'
 export default function VerifyEmailPage() {
   const { token } = useParams()
   const navigate = useNavigate()
-  const [message, setMessage] = useState('Verifying email...')
+  const [message, setMessage] = useState('Klik tombol di bawah untuk menyelesaikan verifikasi email.')
   const [success, setSuccess] = useState(false)
 
   const verifyEmail = useMutation({
-    mutationFn: (t) => api.get(`/auth/verify-email/${t}`),
+    mutationFn: (t) => api.post(`/auth/verify-email/${t}`),
     onSuccess: () => {
       setMessage('Email verified successfully!')
       setSuccess(true)
@@ -20,12 +20,6 @@ export default function VerifyEmailPage() {
       setSuccess(false)
     },
   })
-
-  useEffect(() => {
-    if (token) {
-      verifyEmail.mutate(token)
-    }
-  }, [token])
 
   return (
     <div style={{
@@ -57,8 +51,8 @@ export default function VerifyEmailPage() {
               Go to Login
             </button>
           ) : (
-            <button className="btn btn-gray" onClick={() => navigate('/admin/login')}>
-              Login Anyway
+            <button className="btn btn-red" disabled={!token || verifyEmail.isPending} onClick={() => verifyEmail.mutate(token)}>
+              {verifyEmail.isPending ? 'Memverifikasi...' : 'Verifikasi Email'}
             </button>
           )}
         </div>

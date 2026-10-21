@@ -43,6 +43,25 @@ That requires the server to be a **replica set member** (or `mongos`). Plain sta
 2. Login: `POST /api/auth/login` → response `data.token`.
 3. Protected routes: header `Authorization: Bearer <token>`.
 
+Admin email verification is completed from the frontend confirmation page. The page uses
+`POST /api/auth/verify-email/:token` after the admin clicks the confirmation button; the
+legacy `GET` endpoint remains supported. Reopening a consumed verification link returns
+success so mail link scanners and repeated requests do not report a false failure.
+
+Password recovery uses `POST /api/auth/forgot-password` with `{ "email": "..." }`, then
+`POST /api/auth/reset-password/:token` with `{ "password": "..." }`. Reset links expire
+after one hour and are only issued for active, verified admins. Responses do not disclose
+whether an email exists. A successful reset revokes refresh tokens and invalidates existing
+admin access tokens; the admin must log in again.
+
+The admin header polls pending orders every 30 seconds and low-stock ingredients every
+60 seconds. Store details are available through `GET /api/store-settings`; admins can
+update the location, daily opening sessions, and manual open/closed override with
+`PATCH /api/store-settings`. Opening hours use `HH:MM` (including `24:00` for midnight)
+and are evaluated in `ORDER_BUSINESS_TZ` (default `Asia/Jakarta`). The manual status is
+currently an admin-facing display control; it does not reject customer orders or drive
+WhatsApp automation.
+
 ## Customer CRM v1
 
 Customer CRM is linked automatically when an order is created using `customerPhone`.
@@ -304,7 +323,13 @@ Legacy Phase 2 intelligence endpoints remain available under `/api/analytics/pro
 |--------|------|------|-------------|
 | GET | `/api/health` | No | Liveness |
 | POST | `/api/auth/register-admin` | No | Register admin (restricted) |
+| POST | `/api/auth/verify-email/:token` | No | Confirm admin email (GET remains supported) |
 | POST | `/api/auth/login` | No | Login |
+| POST | `/api/auth/forgot-password` | No | Request a password reset link |
+| POST | `/api/auth/reset-password/:token` | No | Set a new password using a reset link |
+| GET | `/api/auth/me` | Admin | Current account identity for the profile menu |
+| GET | `/api/store-settings` | Admin | Store hours, location, and current open status |
+| PATCH | `/api/store-settings` | Admin | Update store hours, location, or manual status |
 | GET | `/api/menus` | No | Available menus |
 | POST | `/api/menus` | Admin | Create menu |
 | PATCH | `/api/menus/:id` | Admin | Update menu |

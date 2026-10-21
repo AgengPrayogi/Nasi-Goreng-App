@@ -36,6 +36,9 @@ import AdminMarketplacePage from './pages/AdminMarketplacePage.jsx'
 import ReservationPage from './pages/ReservationPage.jsx'
 import AdminReservationsPage from './pages/AdminReservationsPage.jsx'
 import OrderFeedbackPage from './pages/OrderFeedbackPage.jsx'
+import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
+import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
+import AdminProfilePage from './pages/AdminProfilePage.jsx'
 
 function App() {
   const isAuthenticated = !!(localStorage.getItem('jwt') || localStorage.getItem('adminToken'))
@@ -53,6 +56,8 @@ function App() {
       {/* Admin routes */}
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/register" element={<AdminRegister />} />
+      <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email-pending" element={<VerifyEmailPendingPage />} />
       <Route
         path="/admin/*"
@@ -60,6 +65,7 @@ function App() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="profile" element={<AdminProfilePage />} />
         <Route path="orders" element={<OrdersDashboard />} />
         <Route path="orders/new" element={<AdminCreateOrder />} />
         <Route path="orders/:id" element={<OrderDetailPage />} />

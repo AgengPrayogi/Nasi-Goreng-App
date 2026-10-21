@@ -9,12 +9,8 @@ export default function AdminRegister() {
   const [passError, setPassError] = useState('')
 
   const registerMutation = useMutation({
-    mutationFn: (body) => {
-      console.log('📤 REGISTER REQUEST PAYLOAD:', JSON.stringify(body));
-      return api.post('/auth/register-admin', body);
-    },
-    onSuccess: (data) => {
-      console.log('✅ REGISTRATION SUCCESS:', JSON.stringify(data.data));
+    mutationFn: (body) => api.post('/auth/register-admin', body),
+    onSuccess: () => {
       navigate('/verify-email-pending', {
         state: { email: form.email },
         replace: true

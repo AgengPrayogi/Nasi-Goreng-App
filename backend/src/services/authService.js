@@ -77,10 +77,15 @@ async function verifyAdminEmail(token) {
   });
 
   if (!admin) {
+    // Re-opened links (for example by mail scanners) should not show a false failure.
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const previouslyVerified = await Admin.findOne({ isVerified: true, lastVerificationTokenHash: tokenHash });
+    if (previouslyVerified) return previouslyVerified;
     throw new AppError('Invalid or expired verification token', 400, 'INVALID_VERIFICATION_TOKEN');
   }
 
   admin.isVerified = true;
+  admin.lastVerificationTokenHash = crypto.createHash('sha256').update(token).digest('hex');
   admin.verificationToken = '';
   admin.verificationTokenExpiry = null;
   await admin.save();
@@ -150,7 +155,8 @@ async function loginAdmin({ email, password }, ipAddress, userAgent) {
   const token = jwt.sign(
     {
       sub: admin._id.toString(),
-      email: admin.email
+      email: admin.email,
+      authVersion: admin.authVersion || 0
     },
     secret,
     { expiresIn: '12h' }
@@ -207,7 +213,8 @@ async function refreshAccessToken(refreshTokenValue) {
   const newToken = jwt.sign(
     {
       sub: admin._id.toString(),
-      email: admin.email
+      email: admin.email,
+      authVersion: admin.authVersion || 0
     },
     secret,
     { expiresIn: '12h' }
@@ -220,7 +227,7 @@ async function refreshAccessToken(refreshTokenValue) {
 }
 
 async function requestPasswordReset(email, ipAddress) {
-  const admin = await Admin.findOne({ email });
+  const admin = await Admin.findOne({ email, isVerified: true, isActive: true });
   
   if (!admin) {
     // Don't reveal if email exists (security best practice)
@@ -261,9 +268,11 @@ async function resetPassword(token, newPassword) {
 
   admin.passwordHash = passwordHash;
   admin.passwordChangedAt = new Date();
+  admin.authVersion = (admin.authVersion || 0) + 1;
   admin.resetToken = '';
   admin.resetTokenExpiry = null;
   await admin.save();
+  await RefreshToken.updateMany({ adminId: admin._id, isRevoked: false }, { isRevoked: true });
 
   try {
     await sendPasswordChangedEmail(admin.email);
@@ -294,7 +303,9 @@ async function changePassword(adminId, currentPassword, newPassword, ipAddress) 
 
   admin.passwordHash = passwordHash;
   admin.passwordChangedAt = new Date();
+  admin.authVersion = (admin.authVersion || 0) + 1;
   await admin.save();
+  await RefreshToken.updateMany({ adminId: admin._id, isRevoked: false }, { isRevoked: true });
 
   try {
     await sendPasswordChangedEmail(admin.email);

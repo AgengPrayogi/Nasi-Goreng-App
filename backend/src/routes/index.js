@@ -25,6 +25,7 @@ const marketplaceRoutes = require('./marketplace');
 const reservationRoutes = require('./reservations');
 const whatsappRoutes = require('./whatsapp');
 const feedbackRoutes = require('./feedback');
+const storeSettingsRoutes = require('./storeSettings');
 
 const router = express.Router();
 
@@ -54,6 +55,7 @@ router.use('/marketplace', marketplaceRoutes);
 router.use('/reservations', reservationRoutes);
 router.use('/whatsapp', whatsappRoutes);
 router.use('/feedback', feedbackRoutes);
+router.use('/store-settings', storeSettingsRoutes);
 
 module.exports = router;
 

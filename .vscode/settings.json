@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^node -e \"const s=require\\('\\./src/validators/reservationValidator'\\)\\.availabilityQuerySchema; const v=s\\.validate\\(\\{startAt:new Date\\(Date\\.now\\(\\)\\+86400000\\)\\.toISOString\\(\\),partySize:'3'\\}\\); console\\.dir\\(v,\\{depth:5\\}\\);\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "deploy": "npm run build && wrangler deploy",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -30,6 +31,7 @@
     "globals": "^17.6.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "wrangler": "^4.159.0"
   }
 }
